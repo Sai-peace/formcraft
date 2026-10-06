@@ -9,7 +9,12 @@ type RouteContext = {
 };
 
 // Fallback chain in case one model encounters 503 high demand or quota
-const CANDIDATE_MODELS = ["gemini-3.8-flash", "gemini-3.1-pro-preview"];
+// Free-tier enabled Flash models (Pro has limit: 0 on free tier)
+const CANDIDATE_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-flash",
+];
 
 export async function POST(_req: Request, { params }: RouteContext) {
   try {
@@ -116,7 +121,6 @@ For sentiment, pick one: "Positive", "Neutral", "Negative", or "Mixed".
     let responseText = "";
     let lastError: unknown = null;
 
-    // Try candidate models in sequence if one throws 503 or 404
     for (const model of CANDIDATE_MODELS) {
       try {
         const response = await ai.models.generateContent({
@@ -133,10 +137,12 @@ For sentiment, pick one: "Positive", "Neutral", "Negative", or "Mixed".
         }
       } catch (err: unknown) {
         console.warn(
-          `Model ${model} failed, trying fallback:`,
+          `Model ${model} request failed:`,
           err instanceof Error ? err.message : err,
         );
         lastError = err;
+        // Wait 800ms before falling back to the next flash model
+        await new Promise((resolve) => setTimeout(resolve, 800));
       }
     }
 
@@ -144,7 +150,7 @@ For sentiment, pick one: "Positive", "Neutral", "Negative", or "Mixed".
       throw (
         lastError ||
         new Error(
-          "All AI models are currently busy. Please retry in a few seconds.",
+          "AI services are currently busy. Please try again in a few moments.",
         )
       );
     }
