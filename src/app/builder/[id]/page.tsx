@@ -12,7 +12,6 @@ import {
   Download,
   RefreshCw,
   Share2,
-  Sparkles,
   Bot,
   BrainCircuit,
   TrendingUp,
@@ -73,6 +72,10 @@ interface RawResponse {
   createdAt: string;
 }
 
+interface ParsedResponse extends RawResponse {
+  data: AnswersMap;
+}
+
 interface AiInsightsData {
   summary: string;
   sentiment: "Positive" | "Neutral" | "Negative" | "Mixed";
@@ -90,10 +93,6 @@ type AnswerValue =
   | undefined;
 
 type AnswersMap = Record<string, AnswerValue>;
-
-interface ParsedResponse extends RawResponse {
-  data: AnswersMap;
-}
 
 export default function BuilderPage({
   params,
@@ -156,15 +155,16 @@ export default function BuilderPage({
         }),
       });
 
-      if (res.ok) {
-        setSavedSuccess(true);
-
-        window.setTimeout(() => {
-          setSavedSuccess(false);
-        }, 2000);
-      } else {
+      if (!res.ok) {
         console.error("Failed to save form:", await res.text());
+        return;
       }
+
+      setSavedSuccess(true);
+
+      window.setTimeout(() => {
+        setSavedSuccess(false);
+      }, 2000);
     } catch (error) {
       console.error("Failed to save form:", error);
     } finally {
@@ -199,7 +199,18 @@ export default function BuilderPage({
 
       const data: unknown = await res.json();
 
-      setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
+      setResponses(
+        Array.isArray(data)
+          ? data.filter(
+              (item): item is RawResponse =>
+                typeof item === "object" &&
+                item !== null &&
+                "id" in item &&
+                "answers" in item &&
+                "createdAt" in item,
+            )
+          : [],
+      );
     } catch (error) {
       console.error("Failed to fetch responses:", error);
       setResponses([]);
@@ -217,29 +228,39 @@ export default function BuilderPage({
         method: "POST",
       });
 
-      const data: {
-        error?: string;
-        insights?: AiInsightsData;
-      } = await res.json();
+      const data: unknown = await res.json();
 
       if (!res.ok) {
-        setAiError(data.error || "Failed to generate AI insights.");
+        const message =
+          typeof data === "object" &&
+          data !== null &&
+          "error" in data &&
+          typeof data.error === "string"
+            ? data.error
+            : "Failed to generate AI insights.";
+
+        setAiError(message);
         return;
       }
 
-      if (!data.insights) {
-        setAiError("AI returned no insights.");
-        return;
+      if (
+        typeof data === "object" &&
+        data !== null &&
+        "insights" in data &&
+        typeof data.insights === "object" &&
+        data.insights !== null
+      ) {
+        const insights = data.insights as AiInsightsData;
+        setAiInsights(insights);
+      } else {
+        setAiError("The AI response was invalid.");
       }
-
-      setAiInsights(data.insights);
     } catch (error) {
-      const message =
+      setAiError(
         error instanceof Error
           ? error.message
-          : "Failed to communicate with AI synthesizer.";
-
-      setAiError(message);
+          : "Failed to communicate with AI synthesizer.",
+      );
     } finally {
       setGeneratingAi(false);
     }
@@ -248,7 +269,7 @@ export default function BuilderPage({
   useEffect(() => {
     let ignore = false;
 
-    async function loadForm() {
+    const loadForm = async () => {
       try {
         const res = await fetch(`/api/forms/${formId}`, {
           cache: "no-store",
@@ -281,7 +302,7 @@ export default function BuilderPage({
           router.push("/");
         }
       }
-    }
+    };
 
     void loadForm();
 
@@ -304,17 +325,25 @@ export default function BuilderPage({
         });
 
         if (!res.ok) {
-          if (!ignore) {
-            setResponses([]);
-          }
-
+          if (!ignore) setResponses([]);
           return;
         }
 
         const data: unknown = await res.json();
 
         if (!ignore) {
-          setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
+          setResponses(
+            Array.isArray(data)
+              ? data.filter(
+                  (item): item is RawResponse =>
+                    typeof item === "object" &&
+                    item !== null &&
+                    "id" in item &&
+                    "answers" in item &&
+                    "createdAt" in item,
+                )
+              : [],
+          );
         }
       } catch (error) {
         console.error("Failed to load responses:", error);
@@ -419,10 +448,14 @@ export default function BuilderPage({
       let answersMap: AnswersMap = {};
 
       try {
-        answersMap =
+        const parsed: unknown =
           typeof response.answers === "string"
-            ? (JSON.parse(response.answers) as AnswersMap)
-            : {};
+            ? JSON.parse(response.answers)
+            : response.answers;
+
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          answersMap = parsed as AnswersMap;
+        }
       } catch {
         answersMap = {};
       }
@@ -471,10 +504,10 @@ export default function BuilderPage({
 
   if (!form) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-          <span className="text-xs">Loading workspace...</span>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-xs text-slate-400">Loading workspace...</p>
         </div>
       </div>
     );
@@ -507,29 +540,30 @@ export default function BuilderPage({
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
+      {/* Background Glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-600/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[300px] bg-purple-600/5 blur-[120px] rounded-full" />
       </div>
 
+      {/* Top Header */}
       <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <button
-                type="button"
-                onClick={() => router.push("/")}
-                className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
-                title="Return to Dashboard"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
+              title="Return to Dashboard"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
 
+            <div className="min-w-0 flex-1">
               <input
-                type="text"
                 value={form.title}
                 onChange={(event) => {
-                  const updated = {
+                  const updated: FormData = {
                     ...form,
                     title: event.target.value,
                   };
@@ -538,57 +572,55 @@ export default function BuilderPage({
                   void saveForm(questions, updated);
                 }}
                 className="font-bold text-white text-sm sm:text-base bg-transparent border-b border-transparent hover:border-slate-700 focus:border-indigo-500 outline-none pb-0.5 w-44 sm:w-72 transition truncate"
-                aria-label="Form title"
               />
-
-              <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] text-slate-500 whitespace-nowrap">
-                {isSaving ? (
-                  "Saving..."
-                ) : savedSuccess ? (
-                  <>
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    Saved
-                  </>
-                ) : (
-                  "All changes saved"
-                )}
-              </span>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsShareOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-md shadow-indigo-600/20"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Share</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void togglePublishStatus()}
-                className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition cursor-pointer ${
-                  form.published
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                    : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
-                }`}
-              >
-                {form.published ? "Active (Live)" : "Draft Mode"}
-              </button>
-
-              <a
-                href={`/f/${formId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold transition"
-              >
-                View Form
-                <ExternalLink className="w-3 h-3" />
-              </a>
+            <div className="hidden sm:flex items-center gap-2 text-[11px]">
+              {isSaving ? (
+                <span className="text-slate-500">Saving...</span>
+              ) : savedSuccess ? (
+                <span className="text-emerald-400 flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" />
+                  Saved
+                </span>
+              ) : (
+                <span className="text-slate-500">All changes saved</span>
+              )}
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsShareOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-md shadow-indigo-600/20"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void togglePublishStatus()}
+              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition cursor-pointer ${
+                form.published
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                  : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
+              }`}
+            >
+              {form.published ? "Active (Live)" : "Draft Mode"}
+            </button>
+
+            <a
+              href={`/f/${formId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 transition"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              View Form
+            </a>
           </div>
 
+          {/* Navigation Tabs */}
           <div className="flex items-center gap-1 mt-3 overflow-x-auto pb-1">
             <button
               type="button"
@@ -632,15 +664,16 @@ export default function BuilderPage({
         </div>
       </header>
 
+      {/* Main Container */}
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* BUILDER TAB */}
         {activeTab === "builder" && (
           <div className="space-y-5">
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 sm:p-7 backdrop-blur-xl">
               <input
-                type="text"
                 value={form.title}
                 onChange={(event) => {
-                  const updated = {
+                  const updated: FormData = {
                     ...form,
                     title: event.target.value,
                   };
@@ -655,7 +688,7 @@ export default function BuilderPage({
               <textarea
                 value={form.description || ""}
                 onChange={(event) => {
-                  const updated = {
+                  const updated: FormData = {
                     ...form,
                     description: event.target.value,
                   };
@@ -703,6 +736,7 @@ export default function BuilderPage({
           </div>
         )}
 
+        {/* RESPONSES TAB */}
         {activeTab === "responses" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl">
@@ -789,12 +823,14 @@ export default function BuilderPage({
                   </div>
 
                   <span
-                    className={`self-start sm:self-auto px-3 py-1 rounded-full text-xs font-semibold border ${
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${
                       aiInsights.sentiment === "Positive"
                         ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                         : aiInsights.sentiment === "Negative"
                           ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          : aiInsights.sentiment === "Mixed"
+                            ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                            : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                     }`}
                   >
                     {aiInsights.sentiment} Sentiment
@@ -867,7 +903,7 @@ export default function BuilderPage({
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {questions.map((question, index) => {
                   const hasOptions = [
                     "multiple_choice",
@@ -902,55 +938,144 @@ export default function BuilderPage({
                       }
                     });
 
+                    const totalVotes = Object.values(counts).reduce(
+                      (sum, count) => sum + count,
+                      0,
+                    );
+
+                    const paletteColors = [
+                      "#6366f1",
+                      "#8b5cf6",
+                      "#ec4899",
+                      "#10b981",
+                      "#f59e0b",
+                      "#06b6d4",
+                    ];
+
+                    let cumulativeAngle = 0;
+
+                    const segments = (question.options || []).map((opt, i) => {
+                      const count = counts[opt] || 0;
+
+                      const percent =
+                        totalVotes > 0 ? (count / totalVotes) * 100 : 0;
+
+                      const dashLength = percent * 2.512;
+
+                      const dashArray = `${dashLength} ${251.2 - dashLength}`;
+
+                      const dashOffset = -cumulativeAngle * 2.512;
+
+                      cumulativeAngle += percent;
+
+                      return {
+                        opt,
+                        count,
+                        percent: Math.round(percent),
+                        color: paletteColors[i % paletteColors.length],
+                        dashArray,
+                        dashOffset,
+                      };
+                    });
+
                     return (
                       <div
                         key={question.id}
-                        className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm"
+                        className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm"
                       >
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                          <span className="text-xs font-semibold text-white">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5 gap-3">
+                          <span className="text-sm font-semibold text-white">
                             {index + 1}. {question.title}
                           </span>
 
-                          <span className="text-[10px] font-mono text-indigo-400 uppercase">
+                          <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 whitespace-nowrap">
                             {question.type.replace("_", " ")}
                           </span>
                         </div>
 
-                        <div className="space-y-2.5">
-                          {(question.options || []).map((option) => {
-                            const count = counts[option] || 0;
-
-                            const percent =
-                              responses.length > 0
-                                ? Math.round((count / responses.length) * 100)
-                                : 0;
-
-                            return (
-                              <div
-                                key={option}
-                                className="p-3 rounded-xl bg-slate-950/50 border border-slate-800/80"
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                          <div className="flex flex-col items-center justify-center p-3 relative">
+                            <div className="relative w-36 h-36">
+                              <svg
+                                className="w-full h-full -rotate-90"
+                                viewBox="0 0 100 100"
                               >
-                                <div className="flex justify-between text-xs font-medium text-slate-200 mb-1.5 gap-3">
-                                  <span className="break-words">{option}</span>
+                                <circle
+                                  cx="50"
+                                  cy="50"
+                                  r="40"
+                                  className="text-slate-800"
+                                  strokeWidth="12"
+                                  stroke="currentColor"
+                                  fill="transparent"
+                                />
 
-                                  <span className="text-indigo-400 font-semibold font-mono shrink-0">
-                                    {count} {count === 1 ? "vote" : "votes"} (
-                                    {percent}%)
+                                {totalVotes > 0 &&
+                                  segments.map((seg) => (
+                                    <circle
+                                      key={seg.opt}
+                                      cx="50"
+                                      cy="50"
+                                      r="40"
+                                      stroke={seg.color}
+                                      strokeWidth="12"
+                                      strokeDasharray={seg.dashArray}
+                                      strokeDashoffset={seg.dashOffset}
+                                      fill="transparent"
+                                      className="transition-all duration-700"
+                                    />
+                                  ))}
+                              </svg>
+
+                              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                <span className="text-xl font-extrabold text-white font-mono">
+                                  {totalVotes}
+                                </span>
+
+                                <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                                  Votes
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-2 space-y-3">
+                            {segments.map((seg) => (
+                              <div
+                                key={seg.opt}
+                                className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80"
+                              >
+                                <div className="flex items-center justify-between text-xs mb-1.5 gap-3">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span
+                                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                                      style={{
+                                        backgroundColor: seg.color,
+                                      }}
+                                    />
+
+                                    <span className="font-medium text-slate-200 truncate">
+                                      {seg.opt}
+                                    </span>
+                                  </div>
+
+                                  <span className="font-mono font-semibold text-slate-300 shrink-0">
+                                    {seg.count} ({seg.percent}%)
                                   </span>
                                 </div>
 
                                 <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                                    className="h-full rounded-full transition-all duration-500"
                                     style={{
-                                      width: `${percent}%`,
+                                      width: `${seg.percent}%`,
+                                      backgroundColor: seg.color,
                                     }}
                                   />
                                 </div>
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
                         </div>
                       </div>
                     );
@@ -962,17 +1087,13 @@ export default function BuilderPage({
                       (value) =>
                         value !== undefined && value !== null && value !== "",
                     )
-                    .map((value) => {
-                      if (Array.isArray(value)) {
-                        return value.join(", ");
-                      }
-
-                      if (typeof value === "object" && value !== null) {
-                        return JSON.stringify(value);
-                      }
-
-                      return String(value);
-                    });
+                    .map((value) =>
+                      Array.isArray(value)
+                        ? value.join(", ")
+                        : typeof value === "object"
+                          ? JSON.stringify(value)
+                          : String(value),
+                    );
 
                   const completionRate =
                     responses.length > 0
@@ -991,7 +1112,7 @@ export default function BuilderPage({
                           {index + 1}. {question.title}
                         </span>
 
-                        <span className="text-[10px] font-mono text-indigo-400 uppercase shrink-0">
+                        <span className="text-[10px] font-mono text-indigo-400 uppercase whitespace-nowrap">
                           {question.type.replace("_", " ")}
                         </span>
                       </div>
@@ -1056,8 +1177,10 @@ export default function BuilderPage({
           </div>
         )}
 
+        {/* SETTINGS TAB */}
         {activeTab === "settings" && (
           <div className="space-y-6">
+            {/* Visual Theme */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <div>
                 <h3 className="font-bold text-white text-base">
@@ -1078,7 +1201,7 @@ export default function BuilderPage({
                       key={theme.id}
                       type="button"
                       onClick={() => {
-                        const updated = {
+                        const updated: FormData = {
                           ...form,
                           theme: theme.id,
                         };
@@ -1112,6 +1235,7 @@ export default function BuilderPage({
               </div>
             </div>
 
+            {/* Submission Limits & Deadlines */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
               <h3 className="font-bold text-white text-base">
                 Submission Limits & Deadlines
@@ -1132,7 +1256,7 @@ export default function BuilderPage({
                   type="checkbox"
                   checked={form.published}
                   onChange={(event) => {
-                    const updated = {
+                    const updated: FormData = {
                       ...form,
                       published: event.target.checked,
                     };
@@ -1169,7 +1293,7 @@ export default function BuilderPage({
                         ? null
                         : Math.max(0, parseInt(event.target.value, 10) || 0);
 
-                    const updated = {
+                    const updated: FormData = {
                       ...form,
                       maxSubmissions: val,
                     };
@@ -1206,7 +1330,7 @@ export default function BuilderPage({
                       ? new Date(event.target.value).toISOString()
                       : null;
 
-                    const updated = {
+                    const updated: FormData = {
                       ...form,
                       deadline: val,
                     };
@@ -1219,6 +1343,7 @@ export default function BuilderPage({
               </div>
             </div>
 
+            {/* Post-Submission Experience */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
               <h3 className="font-bold text-white text-base">
                 Post-Submission Experience
@@ -1238,7 +1363,7 @@ export default function BuilderPage({
                   placeholder="Thank you for submitting your response!"
                   value={form.customMessage || ""}
                   onChange={(event) => {
-                    const updated = {
+                    const updated: FormData = {
                       ...form,
                       customMessage: event.target.value,
                     };
@@ -1264,7 +1389,7 @@ export default function BuilderPage({
                   placeholder="https://yourwebsite.com/thank-you"
                   value={form.redirectUrl || ""}
                   onChange={(event) => {
-                    const updated = {
+                    const updated: FormData = {
                       ...form,
                       redirectUrl: event.target.value,
                     };
@@ -1277,6 +1402,7 @@ export default function BuilderPage({
               </div>
             </div>
 
+            {/* Collect Email & Alerts */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -1293,7 +1419,7 @@ export default function BuilderPage({
                   type="checkbox"
                   checked={form.collectEmail || false}
                   onChange={(event) => {
-                    const updated = {
+                    const updated: FormData = {
                       ...form,
                       collectEmail: event.target.checked,
                     };
@@ -1320,7 +1446,7 @@ export default function BuilderPage({
                   type="checkbox"
                   checked={form.notifyEmail || false}
                   onChange={(event) => {
-                    const updated = {
+                    const updated: FormData = {
                       ...form,
                       notifyEmail: event.target.checked,
                     };
