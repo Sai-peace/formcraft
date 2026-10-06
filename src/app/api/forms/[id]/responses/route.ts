@@ -158,18 +158,20 @@ export async function POST(req: Request, { params }: RouteContext) {
       }
     }
 
-    if (
-      form.maxSubmissions !== null &&
-      form.maxSubmissions !== undefined &&
-      Number(form.maxSubmissions) >= 0 &&
-      form._count.responses >= Number(form.maxSubmissions)
-    ) {
-      return NextResponse.json(
-        {
-          error: "This form has reached its maximum response capacity.",
-        },
-        { status: 403 },
-      );
+    const maxLimit =
+      form.maxSubmissions !== null && form.maxSubmissions !== undefined
+        ? Number(form.maxSubmissions)
+        : null;
+
+    if (maxLimit !== null && !Number.isNaN(maxLimit) && maxLimit > 0) {
+      if (form._count.responses >= maxLimit) {
+        return NextResponse.json(
+          {
+            error: "This form has reached its maximum response capacity.",
+          },
+          { status: 403 },
+        );
+      }
     }
 
     let body: ResponseBody;
