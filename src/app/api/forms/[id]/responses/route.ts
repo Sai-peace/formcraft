@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -71,7 +77,6 @@ export async function GET(_req: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    // Only the owner of the form can view its responses.
     if (form.user?.email !== session.user.email) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -110,8 +115,6 @@ export async function POST(req: Request, { params }: RouteContext) {
       );
     }
 
-    // Find the form and include everything needed for
-    // publishing, deadline, submission limit and notifications.
     const rawForm = await prisma.form.findUnique({
       where: {
         id,
@@ -130,17 +133,8 @@ export async function POST(req: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    /*
-     * The cast keeps this route compatible when Prisma's generated
-     * client has not refreshed its TypeScript types yet.
-     *
-     * The actual database fields remain unchanged.
-     */
     const form = getFormSettings(rawForm);
 
-    // ---------------------------------------------------------
-    // FORM PUBLISHED CHECK
-    // ---------------------------------------------------------
     if (!form.published) {
       return NextResponse.json(
         {
@@ -150,9 +144,6 @@ export async function POST(req: Request, { params }: RouteContext) {
       );
     }
 
-    // ---------------------------------------------------------
-    // DEADLINE CHECK
-    // ---------------------------------------------------------
     if (form.deadline) {
       const deadline = new Date(form.deadline);
 
@@ -167,9 +158,6 @@ export async function POST(req: Request, { params }: RouteContext) {
       }
     }
 
-    // ---------------------------------------------------------
-    // MAXIMUM SUBMISSIONS CHECK
-    // ---------------------------------------------------------
     if (
       form.maxSubmissions !== null &&
       form.maxSubmissions !== undefined &&
@@ -184,9 +172,6 @@ export async function POST(req: Request, { params }: RouteContext) {
       );
     }
 
-    // ---------------------------------------------------------
-    // READ REQUEST BODY
-    // ---------------------------------------------------------
     let body: ResponseBody;
 
     try {
@@ -209,9 +194,6 @@ export async function POST(req: Request, { params }: RouteContext) {
       );
     }
 
-    // ---------------------------------------------------------
-    // VALIDATE ANSWERS
-    // ---------------------------------------------------------
     if (
       body.answers !== undefined &&
       body.answers !== null &&
@@ -231,9 +213,6 @@ export async function POST(req: Request, { params }: RouteContext) {
         ? body.answers
         : JSON.stringify(body.answers ?? {});
 
-    // ---------------------------------------------------------
-    // SAVE RESPONSE
-    // ---------------------------------------------------------
     const newResponse = await prisma.response.create({
       data: {
         formId: id,
@@ -241,61 +220,62 @@ export async function POST(req: Request, { params }: RouteContext) {
       },
     });
 
-    // 3. Send Email Notification if toggled on
-    if (form.notifyEmail && form.user?.email && process.env.RESEND_API_KEY) {
+    // Send email notification to form owner via Nodemailer.
+    // Email failures do not prevent the response from being saved.
+    if (
+      form.notifyEmail &&
+      form.user?.email &&
+      process.env.SMTP_USER &&
+      process.env.SMTP_PASS
+    ) {
       try {
-        const formUrl = `${
-          process.env.NEXTAUTH_URL || "http://localhost:3000"
-        }/builder/${id}`;
+        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
-        await resend.emails.send({
-          from: "FormCraft <onboarding@resend.dev>",
+        const formUrl = `${baseUrl}/builder/${id}`;
+
+        await transporter.sendMail({
+          from: `"FormCraft" <${process.env.SMTP_USER}>`,
           to: form.user.email,
           subject: `New response received for "${form.title}"`,
           html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1e293b; margin-bottom: 16px;">
-            New Submission Recorded
-          </h2>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #0f172a; margin-bottom: 16px;">
+                New Submission Recorded
+              </h2>
 
-          <p>
-            Someone just filled out your form
-            <strong>"${form.title}"</strong>.
-          </p>
+              <p>
+                Someone just submitted an answer to your form
+                <strong>"${form.title}"</strong>.
+              </p>
 
-          <p style="margin: 24px 0;">
-            <a
-              href="${formUrl}"
-              style="
-                display: inline-block;
-                background: #4f46e5;
-                color: #ffffff;
-                text-decoration: none;
-                padding: 12px 20px;
-                border-radius: 8px;
-                font-weight: 600;
-              "
-            >
-              View Responses in Dashboard
-            </a>
-          </p>
+              <div style="margin: 24px 0;">
+                <a
+                  href="${formUrl}"
+                  style="
+                    display: inline-block;
+                    padding: 12px 18px;
+                    background-color: #4f46e5;
+                    color: #ffffff;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                  "
+                >
+                  View Responses in Dashboard →
+                </a>
+              </div>
 
-          <p style="font-size: 12px; color: #94a3b8; margin-top: 30px;">
-            FormCraft Notifications • You received this because email alerts
-            are enabled on this form.
-          </p>
-        </div>
-      `,
+              <p style="font-size: 13px; color: #64748b;">
+                FormCraft • Obafemi Awolowo University
+              </p>
+            </div>
+          `,
         });
       } catch (mailErr) {
-        // Log the error but don't fail the submission so respondents aren't blocked.
         console.error("Failed to send email alert:", mailErr);
       }
     }
 
-    // ---------------------------------------------------------
-    // SUCCESS RESPONSE
-    // ---------------------------------------------------------
     return NextResponse.json(
       {
         success: true,

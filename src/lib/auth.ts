@@ -9,30 +9,61 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
   ],
+  session: {
+    strategy: "jwt",
+  },
   callbacks: {
-    async session({ session, token }) {
-      if (session?.user && token.sub) {
-        // Ensure user exists in our SQLite database
-        const user = await prisma.user.upsert({
-          where: { email: session.user.email! },
+    async signIn({ user }) {
+      const email = user?.email || "";
+
+      // 1. Enforce OAU student domain strictly
+      if (!email.endsWith("@student.oauife.edu.ng")) {
+        return false;
+      }
+
+      // 2. Ensure user record exists in Prisma/Neon DB
+      try {
+        await prisma.user.upsert({
+          where: { email },
           update: {
-            name: session.user.name,
-            image: session.user.image,
+            name: user.name || "",
+            image: user.image || "",
           },
           create: {
-            id: token.sub,
-            email: session.user.email!,
-            name: session.user.name,
-            image: session.user.image,
+            email,
+            name: user.name || "",
+            image: user.image || "",
           },
         });
-        (session.user as { id: string }).id = user.id;
+        return true;
+      } catch (err) {
+        console.error("Error upserting student user:", err);
+        return false;
+      }
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        // Fetch database ID so session carries the Prisma User ID
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email || "" },
+          select: { id: true },
+        });
+        if (dbUser) {
+          token.sub = dbUser.id;
+        }
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as typeof session.user & { id: string }).id =
+          token.sub as string;
       }
       return session;
     },
   },
-  session: {
-    strategy: "jwt",
+  pages: {
+    error: "/auth/error",
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
