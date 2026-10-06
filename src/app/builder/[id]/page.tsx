@@ -12,8 +12,14 @@ import {
   Download,
   RefreshCw,
   Palette,
+  Sparkles,
+  Bot,
+  BrainCircuit,
+  TrendingUp,
+  AlertCircle,
+  Lightbulb,
+  Share2,
 } from "lucide-react";
-import { Share2 } from "lucide-react";
 import ShareModal from "@/components/ShareModal";
 import {
   DndContext,
@@ -109,7 +115,21 @@ interface RawResponse {
   createdAt: string;
 }
 
-type AnswerValue = string | string[] | number | boolean | null | undefined;
+interface AiInsightsData {
+  summary: string;
+  sentiment: "Positive" | "Neutral" | "Negative" | "Mixed";
+  keyFindings: string[];
+  recommendations: string[];
+}
+
+type AnswerValue =
+  | string
+  | string[]
+  | number
+  | boolean
+  | Record<string, unknown>
+  | null
+  | undefined;
 
 type AnswersMap = Record<string, AnswerValue>;
 
@@ -132,6 +152,10 @@ export default function BuilderPage({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [responses, setResponses] = useState<RawResponse[]>([]);
   const [loadingResponses, setLoadingResponses] = useState(false);
+
+  const [aiInsights, setAiInsights] = useState<AiInsightsData | null>(null);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -189,7 +213,7 @@ export default function BuilderPage({
   const togglePublishStatus = async () => {
     if (!form) return;
 
-    const updated = {
+    const updated: FormData = {
       ...form,
       published: !form.published,
     };
@@ -211,7 +235,7 @@ export default function BuilderPage({
         return;
       }
 
-      const data = await res.json();
+      const data: unknown = await res.json();
 
       setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
     } catch (error) {
@@ -219,6 +243,31 @@ export default function BuilderPage({
       setResponses([]);
     } finally {
       setLoadingResponses(false);
+    }
+  };
+
+  const generateAiInsights = async () => {
+    setGeneratingAi(true);
+    setAiError(null);
+
+    try {
+      const res = await fetch(`/api/forms/${formId}/ai-insights`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAiError(data.error || "Failed to generate AI insights.");
+        return;
+      }
+
+      setAiInsights(data.insights as AiInsightsData);
+    } catch (error) {
+      console.error("AI Insight Error:", error);
+      setAiError("Failed to communicate with AI synthesizer.");
+    } finally {
+      setGeneratingAi(false);
     }
   };
 
@@ -243,7 +292,7 @@ export default function BuilderPage({
         setForm(data);
 
         try {
-          const parsed = JSON.parse(data.fields || "[]");
+          const parsed: unknown = JSON.parse(data.fields || "[]");
 
           setQuestions(
             Array.isArray(parsed) ? (parsed as QuestionField[]) : [],
@@ -256,7 +305,7 @@ export default function BuilderPage({
       }
     }
 
-    loadForm();
+    void loadForm();
 
     return () => {
       ignore = true;
@@ -277,11 +326,13 @@ export default function BuilderPage({
         });
 
         if (!res.ok) {
-          if (!ignore) setResponses([]);
+          if (!ignore) {
+            setResponses([]);
+          }
           return;
         }
 
-        const data = await res.json();
+        const data: unknown = await res.json();
 
         if (!ignore) {
           setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
@@ -292,7 +343,9 @@ export default function BuilderPage({
           setResponses([]);
         }
       } finally {
-        if (!ignore) setLoadingResponses(false);
+        if (!ignore) {
+          setLoadingResponses(false);
+        }
       }
     };
 
@@ -306,9 +359,7 @@ export default function BuilderPage({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (!over || active.id === over.id) {
-      return;
-    }
+    if (!over || active.id === over.id) return;
 
     const oldIndex = questions.findIndex(
       (question) => question.id === active.id,
@@ -316,9 +367,7 @@ export default function BuilderPage({
 
     const newIndex = questions.findIndex((question) => question.id === over.id);
 
-    if (oldIndex === -1 || newIndex === -1) {
-      return;
-    }
+    if (oldIndex === -1 || newIndex === -1) return;
 
     const reordered = arrayMove(questions, oldIndex, newIndex);
 
@@ -426,7 +475,6 @@ export default function BuilderPage({
     });
 
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
 
     link.href = url;
@@ -444,9 +492,9 @@ export default function BuilderPage({
   if (!form) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-slate-400">
-          <div className="w-8 h-8 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
-          <p className="text-sm">Loading workspace...</p>
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-500">Loading workspace...</p>
         </div>
       </main>
     );
@@ -454,7 +502,7 @@ export default function BuilderPage({
 
   const parsedResponses = responses.map((response) => {
     try {
-      const parsed =
+      const parsed: unknown =
         typeof response.answers === "string"
           ? JSON.parse(response.answers)
           : response.answers;
@@ -462,7 +510,7 @@ export default function BuilderPage({
       return {
         ...response,
         data:
-          parsed && typeof parsed === "object"
+          parsed && typeof parsed === "object" && !Array.isArray(parsed)
             ? (parsed as AnswersMap)
             : ({} as AnswersMap),
       };
@@ -478,11 +526,11 @@ export default function BuilderPage({
     responses.length > 0 ? responses.length : (form._count?.responses ?? 0);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="h-16 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="h-16 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
                 onClick={() => router.push("/")}
@@ -490,11 +538,10 @@ export default function BuilderPage({
                 title="Return to Dashboard"
                 aria-label="Return to Dashboard"
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft className="w-4 h-4" />
               </button>
 
               <input
-                type="text"
                 value={form.title}
                 onChange={(event) => {
                   const updated = {
@@ -511,26 +558,26 @@ export default function BuilderPage({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <span className="hidden sm:inline text-xs text-slate-400">
+              <div className="hidden md:flex items-center text-[11px] text-slate-400 mr-1">
                 {isSaving ? (
                   "Saving..."
                 ) : savedSuccess ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-600">
-                    <Check size={13} />
+                  <span className="text-emerald-600 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
                     Saved
                   </span>
                 ) : (
                   "All changes saved"
                 )}
-              </span>
+              </div>
 
               <button
                 type="button"
                 onClick={() => setIsShareOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition cursor-pointer shadow-sm"
               >
-                <Share2 size={14} />
-                Share
+                <Share2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Share</span>
               </button>
 
               <button
@@ -552,7 +599,7 @@ export default function BuilderPage({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 pb-2 overflow-x-auto">
+          <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-hide">
             <button
               type="button"
               onClick={() => setActiveTab("builder")}
@@ -562,7 +609,7 @@ export default function BuilderPage({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <Edit3 size={13} />
+              <Edit3 className="w-3.5 h-3.5" />
               Builder
             </button>
 
@@ -575,7 +622,7 @@ export default function BuilderPage({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <BarChart3 size={13} />
+              <BarChart3 className="w-3.5 h-3.5" />
               Responses ({responseCount})
             </button>
 
@@ -588,19 +635,32 @@ export default function BuilderPage({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <Sliders size={13} />
+              <Sliders className="w-3.5 h-3.5" />
               Settings
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {activeTab === "builder" && (
           <div className="space-y-5">
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Form Builder
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    Create and arrange your questions.
+                  </p>
+                </div>
+              </div>
+
               <input
-                type="text"
                 value={form.title}
                 onChange={(event) => {
                   const updated = {
@@ -668,25 +728,40 @@ export default function BuilderPage({
 
         {activeTab === "responses" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
               <div>
-                <h3 className="text-base font-bold text-slate-800">
+                <h3 className="text-base font-bold text-slate-900">
                   {responses.length}{" "}
                   {responses.length === 1 ? "Response" : "Responses"}
                 </h3>
-
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Live submission records & analytics
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => void generateAiInsights()}
+                  disabled={generatingAi || responses.length === 0}
+                  className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-purple-600/20 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <Bot
+                    className={`w-3.5 h-3.5 ${
+                      generatingAi ? "animate-spin" : ""
+                    }`}
+                  />
+                  <span>
+                    {generatingAi ? "Analyzing..." : "AI Executive Summary"}
+                  </span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => void fetchResponses()}
                   disabled={loadingResponses}
                   title="Refresh responses"
-                  className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${
@@ -700,13 +775,97 @@ export default function BuilderPage({
                   type="button"
                   onClick={exportToCSV}
                   disabled={responses.length === 0}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-medium px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:cursor-not-allowed"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download CSV</span>
                 </button>
               </div>
             </div>
+
+            {aiError && (
+              <div className="flex items-start gap-2.5 p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{aiError}</span>
+              </div>
+            )}
+
+            {aiInsights && (
+              <div className="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/50 p-6 shadow-sm relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-600/20">
+                      <BrainCircuit className="h-4 w-4" />
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        AI Executive Synthesis
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Synthesized across {responses.length} respondent entries
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`self-start sm:self-auto px-3 py-1 rounded-full text-xs font-semibold border ${
+                      aiInsights.sentiment === "Positive"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : aiInsights.sentiment === "Negative"
+                          ? "bg-rose-50 text-rose-700 border-rose-200"
+                          : "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}
+                  >
+                    {aiInsights.sentiment} Sentiment
+                  </span>
+                </div>
+
+                <p className="text-xs leading-relaxed text-slate-700 mb-5 bg-white/70 border border-purple-100 rounded-xl p-3.5">
+                  {aiInsights.summary}
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white/80 border border-purple-100/80 rounded-xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-900 mb-2.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-purple-600" />
+                      <span>Consensus & Trends</span>
+                    </div>
+
+                    <ul className="space-y-2">
+                      {aiInsights.keyFindings.map((finding, index) => (
+                        <li
+                          key={`${finding}-${index}`}
+                          className="text-xs text-slate-600 flex items-start gap-2"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500 mt-1.5 shrink-0" />
+                          <span>{finding}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="bg-white/80 border border-purple-100/80 rounded-xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-900 mb-2.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-indigo-600" />
+                      <span>Actionable Next Steps</span>
+                    </div>
+
+                    <ul className="space-y-2">
+                      {aiInsights.recommendations.map((rec, index) => (
+                        <li
+                          key={`${rec}-${index}`}
+                          className="text-xs text-slate-600 flex items-start gap-2"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {loadingResponses ? (
               <div className="py-20 text-center text-slate-400 text-sm">
@@ -715,11 +874,9 @@ export default function BuilderPage({
             ) : responses.length === 0 ? (
               <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-12 text-center">
                 <BarChart3 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-
                 <h4 className="font-semibold text-slate-800 text-sm">
                   Waiting for responses
                 </h4>
-
                 <p className="text-xs text-slate-400 mt-1">
                   Share your public form link with respondents to begin
                   collecting data.
@@ -766,12 +923,12 @@ export default function BuilderPage({
                         key={question.id}
                         className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"
                       >
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 gap-3">
                           <span className="text-xs font-semibold text-slate-800">
                             {index + 1}. {question.title}
                           </span>
 
-                          <span className="text-[11px] font-mono text-slate-400 uppercase">
+                          <span className="text-[11px] font-mono text-slate-400 uppercase shrink-0">
                             {question.type.replace("_", " ")}
                           </span>
                         </div>
@@ -790,13 +947,12 @@ export default function BuilderPage({
                                 key={option}
                                 className="p-3 rounded-lg bg-slate-50 border border-slate-100"
                               >
-                                <div className="flex justify-between text-xs font-medium text-slate-800 mb-1.5">
+                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-xs font-medium text-slate-800 mb-1.5">
                                   <span>{option}</span>
 
                                   <span className="text-indigo-600 font-semibold font-mono">
                                     {count} {count === 1 ? "vote" : "votes"} (
-                                    {percent}
-                                    %)
+                                    {percent}%)
                                   </span>
                                 </div>
 
@@ -844,22 +1000,21 @@ export default function BuilderPage({
                       key={question.id}
                       className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"
                     >
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 gap-3">
                         <span className="text-xs font-semibold text-slate-800">
                           {index + 1}. {question.title}
                         </span>
 
-                        <span className="text-[11px] font-mono text-slate-400 uppercase">
+                        <span className="text-[11px] font-mono text-slate-400 uppercase shrink-0">
                           {question.type.replace("_", " ")}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                         <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-center">
                           <div className="text-[10px] uppercase font-semibold text-slate-400">
                             Total Entries
                           </div>
-
                           <div className="text-sm font-bold text-slate-800 mt-0.5">
                             {textAnswers.length}
                           </div>
@@ -869,7 +1024,6 @@ export default function BuilderPage({
                           <div className="text-[10px] uppercase font-semibold text-slate-400">
                             Unique Answers
                           </div>
-
                           <div className="text-sm font-bold text-indigo-600 mt-0.5">
                             {uniqueAnswers}
                           </div>
@@ -879,7 +1033,6 @@ export default function BuilderPage({
                           <div className="text-[10px] uppercase font-semibold text-slate-400">
                             Response Rate
                           </div>
-
                           <div className="text-sm font-bold text-emerald-600 mt-0.5">
                             {completionRate}%
                           </div>
@@ -897,7 +1050,9 @@ export default function BuilderPage({
                               key={`${question.id}-${responseIndex}`}
                               className="text-xs text-slate-700 bg-slate-50 border border-slate-100 p-2.5 rounded-lg flex items-center justify-between gap-3"
                             >
-                              <span className="break-words">{text}</span>
+                              <span className="break-words min-w-0">
+                                {text}
+                              </span>
 
                               <span className="text-[10px] text-slate-400 font-mono shrink-0">
                                 #{responseIndex + 1}
@@ -916,10 +1071,10 @@ export default function BuilderPage({
 
         {activeTab === "settings" && (
           <div className="space-y-6">
-            {/* Visual Theme */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
               <div>
-                <h3 className="font-semibold text-slate-800 text-base">
+                <h3 className="font-semibold text-slate-800 text-base flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-indigo-600" />
                   Respondent Color Theme
                 </h3>
 
@@ -968,7 +1123,7 @@ export default function BuilderPage({
 
                       {isSelected && (
                         <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-800 text-white text-[10px] font-bold">
-                          ✓
+                          <Check className="w-3 h-3" />
                         </span>
                       )}
                     </button>
@@ -977,7 +1132,6 @@ export default function BuilderPage({
               </div>
             </div>
 
-            {/* Submission Limits & Deadlines */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
               <div>
                 <h3 className="font-semibold text-slate-800 text-base">
@@ -999,10 +1153,10 @@ export default function BuilderPage({
                 <input
                   type="checkbox"
                   checked={form.published}
-                  onChange={(e) => {
+                  onChange={(event) => {
                     const updated = {
                       ...form,
-                      published: e.target.checked,
+                      published: event.target.checked,
                     };
 
                     setForm(updated);
@@ -1027,11 +1181,11 @@ export default function BuilderPage({
                       ? ""
                       : form.maxSubmissions
                   }
-                  onChange={(e) => {
+                  onChange={(event) => {
                     const val =
-                      e.target.value === ""
+                      event.target.value === ""
                         ? null
-                        : Math.max(0, parseInt(e.target.value, 10) || 0);
+                        : Math.max(0, parseInt(event.target.value, 10) || 0);
 
                     const updated = {
                       ...form,
@@ -1061,9 +1215,9 @@ export default function BuilderPage({
                       ? new Date(form.deadline).toISOString().slice(0, 16)
                       : ""
                   }
-                  onChange={(e) => {
-                    const val = e.target.value
-                      ? new Date(e.target.value).toISOString()
+                  onChange={(event) => {
+                    const val = event.target.value
+                      ? new Date(event.target.value).toISOString()
                       : null;
 
                     const updated = {
@@ -1083,7 +1237,6 @@ export default function BuilderPage({
               </div>
             </div>
 
-            {/* Post-Submission Experience */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
               <div>
                 <h3 className="font-semibold text-slate-800 text-base">
@@ -1100,10 +1253,10 @@ export default function BuilderPage({
                   rows={4}
                   placeholder="Thank you for submitting your response!"
                   value={form.customMessage || ""}
-                  onChange={(e) => {
+                  onChange={(event) => {
                     const updated = {
                       ...form,
-                      customMessage: e.target.value,
+                      customMessage: event.target.value,
                     };
 
                     setForm(updated);
@@ -1122,10 +1275,10 @@ export default function BuilderPage({
                   type="url"
                   placeholder="https://yourwebsite.com/thank-you"
                   value={form.redirectUrl || ""}
-                  onChange={(e) => {
+                  onChange={(event) => {
                     const updated = {
                       ...form,
-                      redirectUrl: e.target.value,
+                      redirectUrl: event.target.value,
                     };
 
                     setForm(updated);
@@ -1141,7 +1294,6 @@ export default function BuilderPage({
               </div>
             </div>
 
-            {/* Collect Email Setting */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -1158,10 +1310,10 @@ export default function BuilderPage({
                 <input
                   type="checkbox"
                   checked={form.collectEmail || false}
-                  onChange={(e) => {
+                  onChange={(event) => {
                     const updated = {
                       ...form,
-                      collectEmail: e.target.checked,
+                      collectEmail: event.target.checked,
                     };
 
                     setForm(updated);
@@ -1172,7 +1324,6 @@ export default function BuilderPage({
               </div>
             </div>
 
-            {/* Notification Alerts */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
               <h3 className="font-semibold text-slate-800 text-base border-b border-slate-100 pb-3">
                 Notification Alerts
@@ -1192,10 +1343,10 @@ export default function BuilderPage({
                 <input
                   type="checkbox"
                   checked={form.notifyEmail || false}
-                  onChange={(e) => {
+                  onChange={(event) => {
                     const updated = {
                       ...form,
-                      notifyEmail: e.target.checked,
+                      notifyEmail: event.target.checked,
                     };
 
                     setForm(updated);
