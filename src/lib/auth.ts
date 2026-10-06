@@ -13,24 +13,36 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async signIn({ user }) {
-      const email = user?.email || "";
+    async signIn({ user, profile }) {
+      // Check both user.email and profile.email, converted to lowercase
+      const userEmail = (
+        user?.email ||
+        (profile as { email?: string })?.email ||
+        ""
+      )
+        .toLowerCase()
+        .trim();
 
-      // 1. Enforce OAU student domain strictly
-      if (!email.endsWith("@student.oauife.edu.ng")) {
-        return false;
+      console.log("NextAuth checking email:", userEmail);
+
+      // Enforce the student domain strictly
+      const isOauStudent = userEmail.endsWith("@student.oauife.edu.ng");
+
+      if (!isOauStudent) {
+        console.warn(`Access denied for non-OAU email: ${userEmail}`);
+        return false; // Rejects the login immediately
       }
 
-      // 2. Ensure user record exists in Prisma/Neon DB
+      // Upsert student record in Neon
       try {
         await prisma.user.upsert({
-          where: { email },
+          where: { email: userEmail },
           update: {
             name: user.name || "",
             image: user.image || "",
           },
           create: {
-            email,
+            email: userEmail,
             name: user.name || "",
             image: user.image || "",
           },
@@ -41,11 +53,19 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
     },
-    async jwt({ token, user }) {
-      if (user) {
-        // Fetch database ID so session carries the Prisma User ID
+    async jwt({ token, user, profile }) {
+      const email = (
+        user?.email ||
+        (profile as { email?: string })?.email ||
+        token.email ||
+        ""
+      )
+        .toLowerCase()
+        .trim();
+
+      if (email) {
         const dbUser = await prisma.user.findUnique({
-          where: { email: user.email || "" },
+          where: { email },
           select: { id: true },
         });
         if (dbUser) {
