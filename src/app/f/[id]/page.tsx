@@ -45,52 +45,64 @@ interface ThemePalette {
   primary: string;
   hover: string;
   light: string;
-  ring: string;
+  bgRgba: string;
+  borderRgba: string;
+  glowRgba: string;
 }
 
 const THEME_PALETTES: Record<string, ThemePalette> = {
   indigo: {
-    primary: "#4f46e5",
-    hover: "#4338ca",
-    light: "#eef2ff",
-    ring: "rgba(79, 70, 229, 0.25)",
+    primary: "#6366f1",
+    hover: "#4f46e5",
+    light: "rgba(99, 102, 241, 0.15)",
+    bgRgba: "rgba(99, 102, 241, 0.12)",
+    borderRgba: "rgba(99, 102, 241, 0.4)",
+    glowRgba: "rgba(99, 102, 241, 0.15)",
   },
   emerald: {
-    primary: "#059669",
-    hover: "#047857",
-    light: "#ecfdf5",
-    ring: "rgba(5, 150, 105, 0.25)",
+    primary: "#10b981",
+    hover: "#059669",
+    light: "rgba(16, 185, 129, 0.15)",
+    bgRgba: "rgba(16, 185, 129, 0.12)",
+    borderRgba: "rgba(16, 185, 129, 0.4)",
+    glowRgba: "rgba(16, 185, 129, 0.15)",
   },
   violet: {
-    primary: "#7c3aed",
-    hover: "#6d28d9",
-    light: "#f5f3ff",
-    ring: "rgba(124, 58, 237, 0.25)",
+    primary: "#a855f7",
+    hover: "#9333ea",
+    light: "rgba(168, 85, 247, 0.15)",
+    bgRgba: "rgba(168, 85, 247, 0.12)",
+    borderRgba: "rgba(168, 85, 247, 0.4)",
+    glowRgba: "rgba(168, 85, 247, 0.15)",
   },
   amber: {
-    primary: "#d97706",
-    hover: "#b45309",
-    light: "#fffbeb",
-    ring: "rgba(217, 119, 6, 0.25)",
+    primary: "#f59e0b",
+    hover: "#d97706",
+    light: "rgba(245, 158, 11, 0.15)",
+    bgRgba: "rgba(245, 158, 11, 0.12)",
+    borderRgba: "rgba(245, 158, 11, 0.4)",
+    glowRgba: "rgba(245, 158, 11, 0.15)",
   },
   rose: {
-    primary: "#e11d48",
-    hover: "#be123c",
-    light: "#fff1f2",
-    ring: "rgba(225, 29, 72, 0.25)",
+    primary: "#f43f5e",
+    hover: "#e11d48",
+    light: "rgba(244, 63, 94, 0.15)",
+    bgRgba: "rgba(244, 63, 94, 0.12)",
+    borderRgba: "rgba(244, 63, 94, 0.4)",
+    glowRgba: "rgba(244, 63, 94, 0.15)",
   },
   slate: {
-    primary: "#1e293b",
-    hover: "#0f172a",
-    light: "#f1f5f9",
-    ring: "rgba(30, 41, 59, 0.25)",
+    primary: "#94a3b8",
+    hover: "#64748b",
+    light: "rgba(148, 163, 184, 0.15)",
+    bgRgba: "rgba(148, 163, 184, 0.12)",
+    borderRgba: "rgba(148, 163, 184, 0.4)",
+    glowRgba: "rgba(148, 163, 184, 0.15)",
   },
 };
 
 export default function PublicFormPage() {
   const params = useParams();
-
-  const [respondentEmail, setRespondentEmail] = useState("");
 
   const formId =
     typeof params?.id === "string"
@@ -102,6 +114,8 @@ export default function PublicFormPage() {
   const [form, setForm] = useState<PublicForm | null>(null);
   const [questions, setQuestions] = useState<PublicQuestion[]>([]);
   const [answers, setAnswers] = useState<Answers>({});
+  const [respondentEmail, setRespondentEmail] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -111,7 +125,7 @@ export default function PublicFormPage() {
   const [viewMode, setViewMode] = useState<"focus" | "classic">("focus");
   const [activeStep, setActiveStep] = useState(0);
 
-  const handleInputChange = (questionId: string, value: AnswerValue) => {
+  const handleInputChange = (questionId: string, value: AnswerValue): void => {
     setAnswers((prev) => {
       if (value === null || value === undefined) {
         const copy = { ...prev };
@@ -126,7 +140,7 @@ export default function PublicFormPage() {
     });
   };
 
-  const handleCheckboxChange = (questionId: string, option: string) => {
+  const handleCheckboxChange = (questionId: string, option: string): void => {
     setAnswers((prev) => {
       const current = Array.isArray(prev[questionId])
         ? (prev[questionId] as string[])
@@ -143,15 +157,17 @@ export default function PublicFormPage() {
     });
   };
 
-  const handleFileUpload = async (questionId: string, file: File) => {
-    setUploadingField(questionId);
-    setErrorMsg(null);
-
+  const handleFileUpload = async (
+    questionId: string,
+    file: File,
+  ): Promise<void> => {
     if (file.size > 10 * 1024 * 1024) {
       setErrorMsg("File size cannot exceed 10MB.");
-      setUploadingField(null);
       return;
     }
+
+    setUploadingField(questionId);
+    setErrorMsg(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -167,7 +183,7 @@ export default function PublicFormPage() {
         url?: string;
         size?: number;
         error?: string;
-      };
+      } = {};
 
       try {
         data = await res.json();
@@ -190,8 +206,8 @@ export default function PublicFormPage() {
         url: data.url,
         size: data.size || file.size,
       });
-    } catch (err) {
-      console.error("Upload error:", err);
+    } catch (error) {
+      console.error("Upload error:", error);
       setErrorMsg("Error uploading file. Please try again.");
     } finally {
       setUploadingField(null);
@@ -210,7 +226,7 @@ export default function PublicFormPage() {
 
     let ignore = false;
 
-    async function loadForm() {
+    const loadForm = async (): Promise<void> => {
       setLoading(true);
       setErrorMsg(null);
 
@@ -239,7 +255,7 @@ export default function PublicFormPage() {
         setForm(data);
 
         try {
-          const parsedFields = JSON.parse(data.fields || "[]");
+          const parsedFields: unknown = JSON.parse(data.fields || "[]");
 
           if (Array.isArray(parsedFields)) {
             setQuestions(parsedFields as PublicQuestion[]);
@@ -252,8 +268,8 @@ export default function PublicFormPage() {
           setQuestions([]);
           setErrorMsg("This form contains invalid question data.");
         }
-      } catch (err) {
-        console.error("Error loading form:", err);
+      } catch (error) {
+        console.error("Error loading form:", error);
 
         if (!ignore) {
           setErrorMsg(
@@ -265,18 +281,19 @@ export default function PublicFormPage() {
           setLoading(false);
         }
       }
-    }
+    };
 
-    loadForm();
+    void loadForm();
 
     return () => {
       ignore = true;
     };
   }, [formId]);
 
-  const totalSteps = useMemo(() => {
-    return (form?.collectEmail ? 1 : 0) + questions.length;
-  }, [form?.collectEmail, questions.length]);
+  const totalSteps = useMemo(
+    () => (form?.collectEmail ? 1 : 0) + questions.length,
+    [form?.collectEmail, questions.length],
+  );
 
   const activeTheme =
     THEME_PALETTES[form?.theme || "indigo"] || THEME_PALETTES.indigo;
@@ -297,19 +314,18 @@ export default function PublicFormPage() {
     }
 
     const questionIndex = form?.collectEmail ? stepIndex - 1 : stepIndex;
-
     const currentQ = questions[questionIndex];
 
     if (!currentQ) return true;
 
-    const val = answers[currentQ.id];
+    const value = answers[currentQ.id];
 
     if (currentQ.required) {
       const empty =
-        val === undefined ||
-        val === null ||
-        (typeof val === "string" && val.trim() === "") ||
-        (Array.isArray(val) && val.length === 0);
+        value === undefined ||
+        value === null ||
+        (typeof value === "string" && value.trim() === "") ||
+        (Array.isArray(value) && value.length === 0);
 
       if (empty) {
         setErrorMsg("Please answer this question to proceed.");
@@ -319,12 +335,12 @@ export default function PublicFormPage() {
 
     if (
       currentQ.type === "email" &&
-      typeof val === "string" &&
-      val.trim() !== ""
+      typeof value === "string" &&
+      value.trim() !== ""
     ) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-      if (!emailRegex.test(val.trim())) {
+      if (!emailRegex.test(value.trim())) {
         setErrorMsg("Please enter a valid email address.");
         return false;
       }
@@ -333,7 +349,7 @@ export default function PublicFormPage() {
     return true;
   };
 
-  const handleNextStep = () => {
+  const handleNextStep = (): void => {
     if (!validateCurrentStep(activeStep)) return;
 
     if (activeStep < totalSteps - 1) {
@@ -341,7 +357,7 @@ export default function PublicFormPage() {
     }
   };
 
-  const handlePrevStep = () => {
+  const handlePrevStep = (): void => {
     setErrorMsg(null);
 
     if (activeStep > 0) {
@@ -349,7 +365,7 @@ export default function PublicFormPage() {
     }
   };
 
-  const triggerSubmit = async () => {
+  const triggerSubmit = async (): Promise<void> => {
     if (submitting) return;
 
     setErrorMsg(null);
@@ -364,27 +380,33 @@ export default function PublicFormPage() {
       }
     }
 
-    for (const q of questions) {
-      const val = answers[q.id];
+    for (const question of questions) {
+      const value = answers[question.id];
 
-      if (q.required) {
+      if (question.required) {
         const empty =
-          val === undefined ||
-          val === null ||
-          (typeof val === "string" && val.trim() === "") ||
-          (Array.isArray(val) && val.length === 0);
+          value === undefined ||
+          value === null ||
+          (typeof value === "string" && value.trim() === "") ||
+          (Array.isArray(value) && value.length === 0);
 
         if (empty) {
-          setErrorMsg(`Please answer required question: "${q.title}"`);
+          setErrorMsg(`Please answer required question: "${question.title}"`);
           return;
         }
       }
 
-      if (q.type === "email" && typeof val === "string" && val.trim() !== "") {
+      if (
+        question.type === "email" &&
+        typeof value === "string" &&
+        value.trim() !== ""
+      ) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-        if (!emailRegex.test(val.trim())) {
-          setErrorMsg(`Please enter a valid email address for "${q.title}".`);
+        if (!emailRegex.test(value.trim())) {
+          setErrorMsg(
+            `Please enter a valid email address for "${question.title}".`,
+          );
           return;
         }
       }
@@ -417,7 +439,7 @@ export default function PublicFormPage() {
         redirectUrl?: string | null;
         customMessage?: string | null;
         error?: string;
-      };
+      } = {};
 
       try {
         data = await res.json();
@@ -437,14 +459,14 @@ export default function PublicFormPage() {
           const redirectUrl = new URL(data.redirectUrl, window.location.origin);
 
           if (
-            redirectUrl.protocol === "http:" ||
-            redirectUrl.protocol === "https:"
+            redirectUrl.protocol !== "http:" &&
+            redirectUrl.protocol !== "https:"
           ) {
-            window.location.href = redirectUrl.toString();
+            setErrorMsg("Invalid redirect URL.");
             return;
           }
 
-          setErrorMsg("Invalid redirect URL.");
+          window.location.href = redirectUrl.toString();
           return;
         } catch {
           setErrorMsg("Invalid redirect URL.");
@@ -453,8 +475,8 @@ export default function PublicFormPage() {
       }
 
       setSubmitted(true);
-    } catch (err) {
-      console.error("Error submitting response:", err);
+    } catch (error) {
+      console.error("Error submitting response:", error);
       setErrorMsg("An unexpected error occurred while submitting.");
     } finally {
       setSubmitting(false);
@@ -466,16 +488,16 @@ export default function PublicFormPage() {
       return;
     }
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Enter" || e.shiftKey) return;
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Enter" || event.shiftKey) return;
 
-      const target = e.target as HTMLElement;
+      const target = event.target as HTMLElement | null;
 
-      if (target.tagName.toLowerCase() === "textarea") {
+      if (target?.tagName.toLowerCase() === "textarea") {
         return;
       }
 
-      e.preventDefault();
+      event.preventDefault();
 
       if (activeStep === totalSteps - 1) {
         void triggerSubmit();
@@ -501,15 +523,19 @@ export default function PublicFormPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10">
-            <Sparkles className="h-7 w-7 animate-pulse text-indigo-400" />
+          <div
+            className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: activeTheme.bgRgba }}
+          >
+            <LayoutList
+              className="h-7 w-7"
+              style={{ color: activeTheme.primary }}
+            />
           </div>
 
-          <p className="text-sm font-medium text-slate-300">
-            Loading questionnaire...
-          </p>
+          <p className="text-sm text-slate-400">Loading questionnaire...</p>
         </div>
       </main>
     );
@@ -517,13 +543,13 @@ export default function PublicFormPage() {
 
   if (errorMsg && !form) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
         <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/80 p-8 text-center shadow-2xl">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400">
-            <AlertCircle className="h-7 w-7" />
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10">
+            <AlertCircle className="h-7 w-7 text-rose-400" />
           </div>
 
-          <h1 className="mt-5 text-2xl font-bold">Form Unavailable</h1>
+          <h1 className="text-2xl font-bold">Form Unavailable</h1>
 
           <p className="mt-3 text-sm leading-6 text-slate-400">{errorMsg}</p>
         </div>
@@ -535,13 +561,13 @@ export default function PublicFormPage() {
 
   if (!form.published) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
         <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/80 p-8 text-center shadow-2xl">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
-            <AlertCircle className="h-7 w-7" />
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
+            <AlertCircle className="h-7 w-7 text-amber-400" />
           </div>
 
-          <h1 className="mt-5 text-2xl font-bold">Questionnaire Closed</h1>
+          <h1 className="text-2xl font-bold">Questionnaire Closed</h1>
 
           <p className="mt-3 text-sm leading-6 text-slate-400">
             This questionnaire is no longer accepting submissions.
@@ -553,30 +579,28 @@ export default function PublicFormPage() {
 
   if (submitted) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
-        <div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900/80 p-8 text-center shadow-2xl backdrop-blur-xl sm:p-10">
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
+        <div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900/80 p-8 text-center shadow-2xl sm:p-10">
           <div
-            className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl"
-            style={{
-              backgroundColor: activeTheme.light,
-              color: activeTheme.primary,
-            }}
+            className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full"
+            style={{ backgroundColor: activeTheme.bgRgba }}
           >
-            <CheckCircle2 className="h-10 w-10" />
+            <CheckCircle2
+              className="h-9 w-9"
+              style={{ color: activeTheme.primary }}
+            />
           </div>
 
           <p
-            className="mt-6 text-xs font-bold uppercase tracking-[0.18em]"
+            className="text-xs font-semibold uppercase tracking-[0.2em]"
             style={{ color: activeTheme.primary }}
           >
             Submission Confirmed
           </p>
 
-          <h1 className="mt-2 text-3xl font-bold text-white">
-            Response Recorded
-          </h1>
+          <h1 className="mt-3 text-3xl font-bold">Response Recorded</h1>
 
-          <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-400">
+          <p className="mt-4 text-sm leading-7 text-slate-400">
             {form.customMessage ||
               `Thank you! Your response to "${form.title}" has been successfully saved.`}
           </p>
@@ -591,10 +615,9 @@ export default function PublicFormPage() {
               setSubmitted(false);
             }}
             style={{ color: activeTheme.primary }}
-            className="mt-6 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold hover:underline"
+            className="mt-6 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold hover:underline"
           >
             Submit another response
-            <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </main>
@@ -611,42 +634,46 @@ export default function PublicFormPage() {
     totalSteps > 0 ? Math.round(((activeStep + 1) / totalSteps) * 100) : 0;
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-slate-950 text-white">
-      {/* Ambient background glow */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-[-15rem] h-[35rem] w-[35rem] -translate-x-1/2 rounded-full bg-indigo-600/10 blur-3xl" />
-        <div className="absolute bottom-[-15rem] left-[-10rem] h-[30rem] w-[30rem] rounded-full bg-purple-600/10 blur-3xl" />
-        <div className="absolute right-[-10rem] top-1/3 h-[30rem] w-[30rem] rounded-full bg-cyan-500/5 blur-3xl" />
-      </div>
+    <main className="min-h-screen overflow-x-hidden bg-slate-950 text-white">
+      <div
+        className="pointer-events-none fixed inset-0 opacity-80"
+        style={{
+          background: `radial-gradient(circle at 50% 0%, ${activeTheme.glowRgba}, transparent 42%)`,
+        }}
+      />
 
-      {/* Top Header Bar */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <div
+        className="fixed left-0 right-0 top-0 z-50 h-1"
+        style={{ backgroundColor: activeTheme.primary }}
+      />
+
+      <header className="relative z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white"
               style={{ backgroundColor: activeTheme.primary }}
             >
               FC
             </div>
 
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">
+              <h1 className="truncate text-sm font-semibold text-white">
                 {form.title}
-              </p>
+              </h1>
 
-              <p className="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500 sm:block">
+              <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                <School className="h-3 w-3" />
                 OAU Campus Survey
               </p>
             </div>
           </div>
 
-          {/* Mode Switcher */}
-          <div className="flex shrink-0 items-center rounded-xl border border-slate-800 bg-slate-900/80 p-1">
+          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/70 p-1">
             <button
               type="button"
               onClick={() => setViewMode("focus")}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
                 viewMode === "focus"
                   ? "bg-slate-800 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -659,7 +686,7 @@ export default function PublicFormPage() {
             <button
               type="button"
               onClick={() => setViewMode("classic")}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
                 viewMode === "classic"
                   ? "bg-slate-800 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -671,9 +698,8 @@ export default function PublicFormPage() {
           </div>
         </div>
 
-        {/* Focus Mode Progress */}
         {viewMode === "focus" && totalSteps > 0 && (
-          <div className="h-0.5 w-full bg-slate-900">
+          <div className="h-0.5 bg-slate-900">
             <div
               className="h-full transition-all duration-500"
               style={{
@@ -685,54 +711,44 @@ export default function PublicFormPage() {
         )}
       </header>
 
-      <div className="relative z-10 mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-        {/* Global Error Banner */}
+      <div className="relative z-10 mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
         {errorMsg && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-300">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
             <span>{errorMsg}</span>
           </div>
         )}
 
-        {/* FOCUS MODE */}
         {viewMode === "focus" && (
-          <section>
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Question {Math.min(activeStep + 1, totalSteps)} of{" "}
-                  {totalSteps}
-                </p>
-              </div>
+          <section className="mx-auto max-w-2xl">
+            <div className="mb-8 flex items-center justify-between text-xs">
+              <span className="font-medium text-slate-400">
+                Question {Math.min(activeStep + 1, totalSteps)} of {totalSteps}
+              </span>
 
-              <span className="text-xs font-medium text-slate-500">
+              <span style={{ color: activeTheme.primary }}>
                 {progressPercent}% completed
               </span>
             </div>
 
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
+            <div className="min-h-[420px] rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
               {isFocusEmailStep ? (
                 <div>
-                  <div className="mb-6">
-                    <div className="mb-4 flex items-center gap-2">
-                      <span
-                        className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
-                        style={{
-                          backgroundColor: activeTheme.light,
-                          color: activeTheme.primary,
-                        }}
-                      >
-                        Step 1
-                      </span>
+                  <div className="mb-8">
+                    <p
+                      className="mb-3 text-xs font-semibold uppercase tracking-[0.18em]"
+                      style={{ color: activeTheme.primary }}
+                    >
+                      Step 1
+                    </p>
 
-                      <span className="rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-rose-400">
-                        Required
-                      </span>
-                    </div>
+                    <span className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-300">
+                      Required
+                    </span>
 
-                    <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <h2 className="mt-5 text-2xl font-bold leading-tight sm:text-3xl">
                       What is your official student email?
-                    </h1>
+                    </h2>
 
                     <p className="mt-3 text-sm leading-6 text-slate-400">
                       Your institutional address will be securely recorded with
@@ -743,34 +759,44 @@ export default function PublicFormPage() {
                   <input
                     type="email"
                     value={respondentEmail}
-                    onChange={(e) => setRespondentEmail(e.target.value)}
+                    onChange={(event) => setRespondentEmail(event.target.value)}
                     placeholder="name@student.oauife.edu.ng"
                     autoFocus
-                    className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                    style={{
+                      borderColor: respondentEmail
+                        ? activeTheme.primary
+                        : undefined,
+                    }}
+                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
                   />
                 </div>
               ) : currentFocusQ ? (
                 <div>
-                  <div className="mb-6">
+                  <div className="mb-8">
                     <div className="mb-4 flex items-center gap-2">
-                      <span className="rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                      <span
+                        className="text-xs font-semibold uppercase tracking-[0.18em]"
+                        style={{ color: activeTheme.primary }}
+                      >
                         Question {activeStep + 1}
                       </span>
 
-                      {currentFocusQ.required ? (
-                        <span className="rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-rose-400">
-                          Required
-                        </span>
-                      ) : (
-                        <span className="rounded-full border border-slate-700 bg-slate-800/50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                          Optional
-                        </span>
-                      )}
+                      <span className="text-slate-700">•</span>
+
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                          currentFocusQ.required
+                            ? "bg-rose-500/10 text-rose-300"
+                            : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        {currentFocusQ.required ? "Required" : "Optional"}
+                      </span>
                     </div>
 
-                    <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <h2 className="text-2xl font-bold leading-tight sm:text-3xl">
                       {currentFocusQ.title}
-                    </h1>
+                    </h2>
                   </div>
 
                   {currentFocusQ.type === "short_answer" && (
@@ -781,12 +807,12 @@ export default function PublicFormPage() {
                           ? (answers[currentFocusQ.id] as string)
                           : ""
                       }
-                      onChange={(e) =>
-                        handleInputChange(currentFocusQ.id, e.target.value)
+                      onChange={(event) =>
+                        handleInputChange(currentFocusQ.id, event.target.value)
                       }
                       placeholder="Type your response here..."
                       autoFocus
-                      className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
                     />
                   )}
 
@@ -798,37 +824,50 @@ export default function PublicFormPage() {
                           ? (answers[currentFocusQ.id] as string)
                           : ""
                       }
-                      onChange={(e) =>
-                        handleInputChange(currentFocusQ.id, e.target.value)
+                      onChange={(event) =>
+                        handleInputChange(currentFocusQ.id, event.target.value)
                       }
                       placeholder="name@student.oauife.edu.ng"
                       autoFocus
-                      className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
                     />
                   )}
 
                   {currentFocusQ.type === "multiple_choice" && (
                     <div className="space-y-3">
-                      {(currentFocusQ.options || []).map((opt, oIdx) => {
-                        const isSelected = answers[currentFocusQ.id] === opt;
+                      {(currentFocusQ.options || []).map((option) => {
+                        const isSelected = answers[currentFocusQ.id] === option;
 
                         return (
                           <button
                             type="button"
-                            key={`${currentFocusQ.id}-${oIdx}`}
+                            key={option}
                             onClick={() =>
-                              handleInputChange(currentFocusQ.id, opt)
+                              handleInputChange(currentFocusQ.id, option)
                             }
-                            className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left text-xs font-medium transition sm:text-sm ${
+                            style={{
+                              borderColor: isSelected
+                                ? activeTheme.primary
+                                : undefined,
+                              backgroundColor: isSelected
+                                ? activeTheme.bgRgba
+                                : undefined,
+                            }}
+                            className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border p-4 text-left text-xs font-medium transition sm:text-sm ${
                               isSelected
-                                ? "border-indigo-500 bg-indigo-600/10 text-white shadow-md"
+                                ? "text-white shadow-lg"
                                 : "border-slate-800 bg-slate-950/50 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
                             }`}
                           >
-                            <span>{opt}</span>
+                            <span>{option}</span>
 
                             {isSelected && (
-                              <CheckCircle2 className="h-5 w-5 shrink-0 text-indigo-400" />
+                              <CheckCircle2
+                                className="h-5 w-5 shrink-0"
+                                style={{
+                                  color: activeTheme.primary,
+                                }}
+                              />
                             )}
                           </button>
                         );
@@ -838,29 +877,42 @@ export default function PublicFormPage() {
 
                   {currentFocusQ.type === "checkbox" && (
                     <div className="space-y-3">
-                      {(currentFocusQ.options || []).map((opt, oIdx) => {
+                      {(currentFocusQ.options || []).map((option) => {
                         const answer = answers[currentFocusQ.id];
 
                         const isSelected =
-                          Array.isArray(answer) && answer.includes(opt);
+                          Array.isArray(answer) && answer.includes(option);
 
                         return (
                           <button
                             type="button"
-                            key={`${currentFocusQ.id}-${oIdx}`}
+                            key={option}
                             onClick={() =>
-                              handleCheckboxChange(currentFocusQ.id, opt)
+                              handleCheckboxChange(currentFocusQ.id, option)
                             }
-                            className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left text-xs font-medium transition sm:text-sm ${
+                            style={{
+                              borderColor: isSelected
+                                ? activeTheme.primary
+                                : undefined,
+                              backgroundColor: isSelected
+                                ? activeTheme.bgRgba
+                                : undefined,
+                            }}
+                            className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border p-4 text-left text-xs font-medium transition sm:text-sm ${
                               isSelected
-                                ? "border-indigo-500 bg-indigo-600/10 text-white shadow-md"
+                                ? "text-white shadow-lg"
                                 : "border-slate-800 bg-slate-950/50 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
                             }`}
                           >
-                            <span>{opt}</span>
+                            <span>{option}</span>
 
                             {isSelected && (
-                              <span className="font-bold text-indigo-400">
+                              <span
+                                className="text-lg font-bold"
+                                style={{
+                                  color: activeTheme.primary,
+                                }}
+                              >
                                 ✓
                               </span>
                             )}
@@ -877,16 +929,16 @@ export default function PublicFormPage() {
                           ? (answers[currentFocusQ.id] as string)
                           : ""
                       }
-                      onChange={(e) =>
-                        handleInputChange(currentFocusQ.id, e.target.value)
+                      onChange={(event) =>
+                        handleInputChange(currentFocusQ.id, event.target.value)
                       }
-                      className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-200 outline-none transition focus:border-indigo-500"
+                      autoFocus
+                      className="w-full cursor-pointer rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition focus:border-slate-500"
                     >
                       <option value="">Select an option</option>
-
-                      {(currentFocusQ.options || []).map((opt, oIdx) => (
-                        <option key={`${currentFocusQ.id}-${oIdx}`} value={opt}>
-                          {opt}
+                      {(currentFocusQ.options || []).map((option) => (
+                        <option key={option} value={option}>
+                          {option}
                         </option>
                       ))}
                     </select>
@@ -900,23 +952,23 @@ export default function PublicFormPage() {
                           ? (answers[currentFocusQ.id] as string)
                           : ""
                       }
-                      onChange={(e) =>
-                        handleInputChange(currentFocusQ.id, e.target.value)
+                      onChange={(event) =>
+                        handleInputChange(currentFocusQ.id, event.target.value)
                       }
-                      className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-200 outline-none transition focus:border-indigo-500"
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-slate-200 outline-none transition focus:border-slate-500"
                     />
                   )}
 
                   {currentFocusQ.type === "file_upload" && (
-                    <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 p-5">
+                    <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 p-5">
                       {answers[currentFocusQ.id] &&
                       typeof answers[currentFocusQ.id] === "object" &&
                       !Array.isArray(answers[currentFocusQ.id]) ? (
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-3">
-                            <Paperclip className="h-5 w-5 shrink-0 text-indigo-400" />
+                            <Paperclip className="h-5 w-5 shrink-0 text-slate-400" />
 
-                            <span className="truncate text-sm text-slate-300">
+                            <span className="truncate text-sm text-slate-200">
                               {(answers[currentFocusQ.id] as UploadedFile).name}
                             </span>
                           </div>
@@ -926,36 +978,36 @@ export default function PublicFormPage() {
                             onClick={() =>
                               handleInputChange(currentFocusQ.id, null)
                             }
-                            className="ml-3 shrink-0 text-xs text-rose-400 hover:underline"
+                            className="ml-3 shrink-0 cursor-pointer text-xs text-rose-400 hover:underline"
                           >
                             Remove
                           </button>
                         </div>
                       ) : (
-                        <label className="flex cursor-pointer flex-col items-center justify-center py-5 text-center">
-                          <UploadCloud className="mb-3 h-8 w-8 text-slate-500" />
+                        <label className="block cursor-pointer text-center">
+                          <UploadCloud className="mx-auto mb-3 h-8 w-8 text-slate-500" />
 
-                          <span className="text-sm font-semibold text-slate-300">
+                          <span className="text-sm font-medium text-slate-200">
                             {uploadingField === currentFocusQ.id
                               ? "Uploading file..."
                               : "Select attachment"}
                           </span>
 
-                          <span className="mt-1 text-xs text-slate-500">
+                          <p className="mt-1 text-xs text-slate-500">
                             Max file size 10MB
-                          </span>
+                          </p>
 
                           <input
                             type="file"
                             disabled={uploadingField === currentFocusQ.id}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
 
-                              if (f) {
-                                void handleFileUpload(currentFocusQ.id, f);
+                              if (file) {
+                                void handleFileUpload(currentFocusQ.id, file);
                               }
 
-                              e.currentTarget.value = "";
+                              event.currentTarget.value = "";
                             }}
                             className="hidden"
                           />
@@ -965,25 +1017,25 @@ export default function PublicFormPage() {
                   )}
                 </div>
               ) : (
-                <div className="py-12 text-center text-sm text-slate-500">
+                <div className="flex min-h-[360px] items-center justify-center text-sm text-slate-500">
                   No questions available.
                 </div>
               )}
             </div>
 
-            <div className="mt-5 flex items-center justify-between gap-3">
+            <div className="mt-6 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={handlePrevStep}
-                disabled={activeStep === 0}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+                disabled={activeStep === 0 || submitting}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-800 px-5 py-3 text-xs font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Previous
               </button>
 
-              <div className="hidden items-center gap-2 text-[11px] text-slate-600 sm:flex">
-                <CornerDownLeft className="h-3.5 w-3.5" />
+              <div className="hidden items-center gap-1.5 text-[10px] text-slate-600 sm:flex">
+                <CornerDownLeft className="h-3 w-3" />
                 Press Enter
               </div>
 
@@ -1000,12 +1052,12 @@ export default function PublicFormPage() {
                 style={{
                   backgroundColor: activeTheme.primary,
                 }}
-                className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-2xl px-6 py-3 text-xs font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {activeStep === totalSteps - 1 ? (
                   <>
                     {submitting ? "Submitting..." : "Complete & Submit"}
-                    <CheckCircle2 className="h-4 w-4" />
+                    {!submitting && <CheckCircle2 className="h-4 w-4" />}
                   </>
                 ) : (
                   <>
@@ -1018,289 +1070,272 @@ export default function PublicFormPage() {
           </section>
         )}
 
-        {/* CLASSIC MODE */}
         {viewMode === "classic" && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void triggerSubmit();
-            }}
-            className="space-y-5"
-          >
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
-              <div className="flex items-start gap-3">
+          <section className="mx-auto max-w-3xl">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void triggerSubmit();
+              }}
+              className="space-y-5"
+            >
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold sm:text-4xl">{form.title}</h1>
+
+                {form.description && (
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">
+                    {form.description}
+                  </p>
+                )}
+              </div>
+
+              {form.collectEmail && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+                  <label className="text-sm font-semibold text-slate-200">
+                    Student Email Address{" "}
+                    <span className="text-rose-400">*</span>
+                  </label>
+
+                  <input
+                    type="email"
+                    value={respondentEmail}
+                    onChange={(event) => setRespondentEmail(event.target.value)}
+                    placeholder="name@student.oauife.edu.ng"
+                    required
+                    className="mt-3 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
+                  />
+                </div>
+              )}
+
+              {questions.map((question, index) => (
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    backgroundColor: activeTheme.light,
-                    color: activeTheme.primary,
-                  }}
+                  key={question.id}
+                  className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5"
                 >
-                  <School className="h-5 w-5" />
-                </div>
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
+                      style={{
+                        backgroundColor: activeTheme.bgRgba,
+                        color: activeTheme.primary,
+                      }}
+                    >
+                      {index + 1}
+                    </span>
 
-                <div className="min-w-0">
-                  <h1 className="text-2xl font-bold text-white sm:text-3xl">
-                    {form.title}
-                  </h1>
-
-                  {form.description && (
-                    <p className="mt-3 text-sm leading-6 text-slate-400">
-                      {form.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {form.collectEmail && (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-                <label className="block text-sm font-semibold text-white">
-                  Student Email Address <span className="text-rose-400">*</span>
-                </label>
-
-                <input
-                  type="email"
-                  value={respondentEmail}
-                  onChange={(e) => setRespondentEmail(e.target.value)}
-                  placeholder="name@student.oauife.edu.ng"
-                  required
-                  className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-            )}
-
-            {questions.map((q, idx) => (
-              <div
-                key={q.id}
-                className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5"
-              >
-                <div className="flex items-start gap-3">
-                  <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
-                    style={{
-                      backgroundColor: activeTheme.light,
-                      color: activeTheme.primary,
-                    }}
-                  >
-                    {idx + 1}
-                  </span>
-
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-sm font-semibold leading-6 text-white">
-                      {q.title}{" "}
-                      {q.required && <span className="text-rose-400">*</span>}
+                    <h2 className="pt-1 text-sm font-semibold text-slate-100">
+                      {question.title}{" "}
+                      {question.required && (
+                        <span className="text-rose-400">*</span>
+                      )}
                     </h2>
+                  </div>
 
-                    {q.type === "short_answer" && (
-                      <input
-                        type="text"
-                        value={
-                          typeof answers[q.id] === "string"
-                            ? (answers[q.id] as string)
-                            : ""
-                        }
-                        onChange={(e) =>
-                          handleInputChange(q.id, e.target.value)
-                        }
-                        placeholder="Your answer"
-                        className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-indigo-500"
-                      />
-                    )}
+                  {question.type === "short_answer" && (
+                    <input
+                      type="text"
+                      value={
+                        typeof answers[question.id] === "string"
+                          ? (answers[question.id] as string)
+                          : ""
+                      }
+                      onChange={(event) =>
+                        handleInputChange(question.id, event.target.value)
+                      }
+                      placeholder="Your answer"
+                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-slate-500"
+                    />
+                  )}
 
-                    {q.type === "email" && (
-                      <input
-                        type="email"
-                        value={
-                          typeof answers[q.id] === "string"
-                            ? (answers[q.id] as string)
-                            : ""
-                        }
-                        onChange={(e) =>
-                          handleInputChange(q.id, e.target.value)
-                        }
-                        placeholder="name@student.oauife.edu.ng"
-                        className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-indigo-500"
-                      />
-                    )}
+                  {question.type === "email" && (
+                    <input
+                      type="email"
+                      value={
+                        typeof answers[question.id] === "string"
+                          ? (answers[question.id] as string)
+                          : ""
+                      }
+                      onChange={(event) =>
+                        handleInputChange(question.id, event.target.value)
+                      }
+                      placeholder="name@student.oauife.edu.ng"
+                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-slate-500"
+                    />
+                  )}
 
-                    {q.type === "multiple_choice" && (
-                      <div className="mt-3 space-y-2">
-                        {(q.options || []).map((opt, oIdx) => (
+                  {question.type === "multiple_choice" && (
+                    <div className="mt-4 space-y-3">
+                      {(question.options || []).map((option) => (
+                        <label
+                          key={option}
+                          className="flex cursor-pointer items-center gap-3 text-sm text-slate-300"
+                        >
+                          <input
+                            type="radio"
+                            name={question.id}
+                            value={option}
+                            checked={answers[question.id] === option}
+                            onChange={(event) =>
+                              handleInputChange(question.id, event.target.value)
+                            }
+                            style={{
+                              accentColor: activeTheme.primary,
+                            }}
+                            className="h-4 w-4"
+                          />
+
+                          {option}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {question.type === "checkbox" && (
+                    <div className="mt-4 space-y-3">
+                      {(question.options || []).map((option) => {
+                        const answer = answers[question.id];
+
+                        const selected =
+                          Array.isArray(answer) && answer.includes(option);
+
+                        return (
                           <label
-                            key={`${q.id}-${oIdx}`}
-                            className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 text-sm text-slate-300 transition hover:border-slate-700"
+                            key={option}
+                            className="flex cursor-pointer items-center gap-3 text-sm text-slate-300"
                           >
                             <input
-                              type="radio"
-                              name={q.id}
-                              value={opt}
-                              checked={answers[q.id] === opt}
-                              onChange={(e) =>
-                                handleInputChange(q.id, e.target.value)
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() =>
+                                handleCheckboxChange(question.id, option)
                               }
                               style={{
                                 accentColor: activeTheme.primary,
                               }}
-                              className="h-4 w-4"
+                              className="h-4 w-4 rounded"
                             />
 
-                            <span>{opt}</span>
+                            {option}
                           </label>
-                        ))}
-                      </div>
-                    )}
+                        );
+                      })}
+                    </div>
+                  )}
 
-                    {q.type === "checkbox" && (
-                      <div className="mt-3 space-y-2">
-                        {(q.options || []).map((opt, oIdx) => {
-                          const answer = answers[q.id];
+                  {question.type === "dropdown" && (
+                    <select
+                      value={
+                        typeof answers[question.id] === "string"
+                          ? (answers[question.id] as string)
+                          : ""
+                      }
+                      onChange={(event) =>
+                        handleInputChange(question.id, event.target.value)
+                      }
+                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none focus:border-slate-500"
+                    >
+                      <option value="">Select an option</option>
 
-                          const selected =
-                            Array.isArray(answer) && answer.includes(opt);
+                      {(question.options || []).map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  )}
 
-                          return (
-                            <label
-                              key={`${q.id}-${oIdx}`}
-                              className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 text-sm text-slate-300 transition hover:border-slate-700"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => handleCheckboxChange(q.id, opt)}
-                                style={{
-                                  accentColor: activeTheme.primary,
-                                }}
-                                className="h-4 w-4 rounded"
-                              />
+                  {question.type === "date" && (
+                    <input
+                      type="date"
+                      value={
+                        typeof answers[question.id] === "string"
+                          ? (answers[question.id] as string)
+                          : ""
+                      }
+                      onChange={(event) =>
+                        handleInputChange(question.id, event.target.value)
+                      }
+                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-200 outline-none focus:border-slate-500"
+                    />
+                  )}
 
-                              <span>{opt}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
+                  {question.type === "file_upload" && (
+                    <div className="mt-4 rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-4">
+                      {answers[question.id] &&
+                      typeof answers[question.id] === "object" &&
+                      !Array.isArray(answers[question.id]) ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
 
-                    {q.type === "dropdown" && (
-                      <select
-                        value={
-                          typeof answers[q.id] === "string"
-                            ? (answers[q.id] as string)
-                            : ""
-                        }
-                        onChange={(e) =>
-                          handleInputChange(q.id, e.target.value)
-                        }
-                        className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                      >
-                        <option value="">Select an option</option>
-
-                        {(q.options || []).map((opt, oIdx) => (
-                          <option key={`${q.id}-${oIdx}`} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-                    {q.type === "date" && (
-                      <input
-                        type="date"
-                        value={
-                          typeof answers[q.id] === "string"
-                            ? (answers[q.id] as string)
-                            : ""
-                        }
-                        onChange={(e) =>
-                          handleInputChange(q.id, e.target.value)
-                        }
-                        className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                      />
-                    )}
-
-                    {q.type === "file_upload" && (
-                      <div className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-950/50 p-4">
-                        {answers[q.id] &&
-                        typeof answers[q.id] === "object" &&
-                        !Array.isArray(answers[q.id]) ? (
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex min-w-0 items-center gap-3">
-                              <Paperclip className="h-4 w-4 shrink-0 text-indigo-400" />
-
-                              <span className="truncate text-sm text-slate-300">
-                                {(answers[q.id] as UploadedFile).name}
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleInputChange(q.id, null)}
-                              className="shrink-0 text-xs text-rose-400 hover:underline"
-                            >
-                              Remove
-                            </button>
+                            <span className="truncate text-sm text-slate-300">
+                              {(answers[question.id] as UploadedFile).name}
+                            </span>
                           </div>
-                        ) : (
-                          <label className="flex cursor-pointer items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-400">
-                              <UploadCloud className="h-5 w-5" />
-                            </div>
 
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-slate-300">
-                                {uploadingField === q.id
-                                  ? "Uploading file..."
-                                  : "Select file to attach"}
-                              </p>
+                          <button
+                            type="button"
+                            onClick={() => handleInputChange(question.id, null)}
+                            className="shrink-0 cursor-pointer text-xs text-rose-400 hover:underline"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="block cursor-pointer text-center">
+                          <UploadCloud className="mx-auto mb-2 h-7 w-7 text-slate-500" />
 
-                              <p className="mt-0.5 text-xs text-slate-500">
-                                Maximum file size: 10MB
-                              </p>
-                            </div>
+                          <span className="text-sm font-medium text-slate-300">
+                            {uploadingField === question.id
+                              ? "Uploading file..."
+                              : "Select file to attach"}
+                          </span>
 
-                            <input
-                              type="file"
-                              disabled={uploadingField === q.id}
-                              onChange={(e) => {
-                                const f = e.target.files?.[0];
+                          <p className="mt-1 text-xs text-slate-500">
+                            Maximum file size: 10MB
+                          </p>
 
-                                if (f) {
-                                  void handleFileUpload(q.id, f);
-                                }
+                          <input
+                            type="file"
+                            disabled={uploadingField === question.id}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
 
-                                e.currentTarget.value = "";
-                              }}
-                              className="hidden"
-                            />
-                          </label>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                              if (file) {
+                                void handleFileUpload(question.id, file);
+                              }
+
+                              event.currentTarget.value = "";
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              ))}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              style={{
-                backgroundColor: activeTheme.primary,
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shadow-xl transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? "Submitting response..." : "Submit Questionnaire"}
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  backgroundColor: activeTheme.primary,
+                }}
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting ? "Submitting response..." : "Submit Questionnaire"}
 
-              {!submitting && <ArrowRight className="h-4 w-4" />}
-            </button>
-          </form>
+                {!submitting && <ArrowRight className="h-4 w-4" />}
+              </button>
+            </form>
+          </section>
         )}
-
-        {/* Footer Branding */}
-        <p className="mt-8 text-center text-[11px] text-slate-600">
-          Powered by FormCraft • Obafemi Awolowo University
-        </p>
       </div>
+
+      <footer className="relative z-10 border-t border-slate-900 px-6 py-8 text-center text-xs text-slate-600">
+        Powered by FormCraft • Obafemi Awolowo University
+      </footer>
     </main>
   );
 }
