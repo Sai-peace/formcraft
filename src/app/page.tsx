@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -19,6 +20,13 @@ import {
   Palette,
   Sparkles,
   Zap,
+  School,
+  Activity,
+  Bot,
+  BrainCircuit,
+  TrendingUp,
+  Clock,
+  ExternalLink,
 } from "lucide-react";
 
 interface FormItem {
@@ -36,7 +44,8 @@ interface Template {
   title: string;
   desc: string;
   icon: typeof Plus;
-  color: string;
+  accent: string;
+  badge: string;
 }
 
 interface FaqItem {
@@ -58,19 +67,27 @@ export default function HomePage() {
     let ignore = false;
 
     async function loadForms() {
-      if (!session) return;
+      if (!session) {
+        setForms([]);
+        return;
+      }
 
       setLoadingForms(true);
 
       try {
         const res = await fetch("/api/forms");
 
-        if (res.ok && !ignore) {
-          const data: FormItem[] = await res.json();
+        if (!res.ok) {
+          throw new Error("Failed to fetch forms");
+        }
+
+        const data: FormItem[] = await res.json();
+
+        if (!ignore) {
           setForms(data);
         }
-      } catch (err) {
-        console.error("Failed to fetch forms", err);
+      } catch (error) {
+        console.error("Failed to fetch forms:", error);
       } finally {
         if (!ignore) {
           setLoadingForms(false);
@@ -102,29 +119,34 @@ export default function HomePage() {
         return;
       }
 
-      const newForm = await res.json();
+      const newForm: { id?: string } = await res.json();
 
       if (newForm?.id) {
         router.push(`/builder/${newForm.id}`);
       }
-    } catch (err) {
-      console.error("Error creating form", err);
+    } catch (error) {
+      console.error("Error creating form:", error);
     }
   };
 
   const deleteForm = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this form?")) return;
+    if (!window.confirm("Are you sure you want to delete this form?")) {
+      return;
+    }
 
     try {
       const res = await fetch(`/api/forms/${id}`, {
         method: "DELETE",
       });
 
-      if (res.ok) {
-        setForms((prev) => prev.filter((form) => form.id !== id));
+      if (!res.ok) {
+        console.error("Failed to delete form");
+        return;
       }
-    } catch (err) {
-      console.error("Error deleting form", err);
+
+      setForms((prev) => prev.filter((form) => form.id !== id));
+    } catch (error) {
+      console.error("Error deleting form:", error);
     }
   };
 
@@ -136,111 +158,154 @@ export default function HomePage() {
       setCopiedId(id);
 
       window.setTimeout(() => {
-        setCopiedId(null);
+        setCopiedId((current) => (current === id ? null : current));
       }, 2000);
-    } catch (err) {
-      console.error("Failed to copy link", err);
+    } catch (error) {
+      console.error("Failed to copy link:", error);
     }
   };
 
+  const faqs: FaqItem[] = [
+    {
+      q: "Who is eligible to create and manage forms on FormCraft?",
+      a: "FormCraft is exclusively locked to Obafemi Awolowo University students and researchers. You must sign in with your official @student.oauife.edu.ng generic student email.",
+    },
+    {
+      q: "Do respondents need an OAU account to fill forms?",
+      a: "No. Anyone you share the public respondent link with can fill it out seamlessly from any device without needing an account.",
+    },
+    {
+      q: "Will I get notified when someone submits an answer?",
+      a: "Yes. Every submission automatically triggers an email notification to your registered inbox when email notifications are configured.",
+    },
+    {
+      q: "Can I export survey findings for my thesis or course project?",
+      a: "FormCraft supports CSV export and response summaries, depending on the features enabled in your account.",
+    },
+  ];
+
+  const templates: Template[] = [
+    {
+      title: "Blank Canvas",
+      desc: "Build question architecture from scratch with complete control.",
+      icon: Plus,
+      accent: "from-indigo-500 to-indigo-600",
+      badge: "Essential",
+    },
+    {
+      title: "Course & Lecturer Evaluation",
+      desc: "Curated linear rating scales for semester academic feedback.",
+      icon: School,
+      accent: "from-purple-500 to-indigo-500",
+      badge: "OAU Special",
+    },
+    {
+      title: "Student Event RSVP",
+      desc: "Department dinner, symposium headcounts & entry badges.",
+      icon: Layers,
+      accent: "from-amber-500 to-rose-500",
+      badge: "Popular",
+    },
+    {
+      title: "Project Research Survey",
+      desc: "Structured multiple-choice grids built for thesis data collection.",
+      icon: BarChart3,
+      accent: "from-emerald-500 to-teal-500",
+      badge: "Academic",
+    },
+  ];
+
   if (status === "loading") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <p className="text-sm text-slate-500">Loading FormCraft...</p>
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-slate-300">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-sm font-bold text-white shadow-lg shadow-indigo-600/30">
+            FC
+          </div>
+          <p className="text-sm text-slate-400">Initializing FormCraft...</p>
+        </div>
       </main>
     );
   }
 
+  // ==========================================
+  // LOGGED-IN DASHBOARD VIEW
+  // ==========================================
   if (session) {
     const filteredForms = forms.filter((form) =>
       form.title.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
-    const templates: Template[] = [
-      {
-        title: "Blank Form",
-        desc: "Start from a clean slate",
-        icon: Plus,
-        color:
-          "bg-indigo-50 text-indigo-600 border-indigo-200 hover:border-indigo-400",
-      },
-      {
-        title: "Customer Feedback",
-        desc: "CSAT score and opinions",
-        icon: FileText,
-        color:
-          "bg-emerald-50 text-emerald-600 border-emerald-200 hover:border-emerald-400",
-      },
-      {
-        title: "Event RSVP",
-        desc: "Headcounts & meal options",
-        icon: Layers,
-        color:
-          "bg-amber-50 text-amber-600 border-amber-200 hover:border-amber-400",
-      },
-      {
-        title: "Course Evaluation",
-        desc: "Instructor and lesson feedback",
-        icon: BarChart3,
-        color:
-          "bg-purple-50 text-purple-600 border-purple-200 hover:border-purple-400",
-      },
-    ];
+    const totalSubmissions = forms.reduce(
+      (total, form) => total + (form._count?.responses ?? 0),
+      0,
+    );
 
     return (
-      <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-800">
-        <nav className="border-b border-slate-200 bg-white">
+      <main className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100">
+        {/* Subtle Ambient Background Mesh */}
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-600/10 blur-3xl" />
+          <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-purple-600/10 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-cyan-600/5 blur-3xl" />
+        </div>
+
+        {/* Navigation */}
+        <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
           <div className="mx-auto max-w-7xl px-3 sm:px-6">
-            <div className="flex min-h-[68px] items-center justify-between gap-2 sm:gap-4">
+            <div className="flex min-h-[72px] items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => router.push("/")}
-                className="flex min-w-0 shrink-0 cursor-pointer items-center gap-2"
+                className="group flex min-w-0 shrink-0 cursor-pointer items-center gap-2.5"
                 aria-label="Go to FormCraft home"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                  <span className="font-bold">FC</span>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition group-hover:scale-105">
+                  FC
                 </div>
 
-                <span className="hidden text-lg font-bold text-slate-900 sm:inline">
-                  FormCraft
-                </span>
+                <div className="min-w-0">
+                  <span className="block text-sm font-bold tracking-tight text-white sm:text-base">
+                    FormCraft
+                  </span>
+                  <span className="hidden text-[10px] font-medium uppercase tracking-[0.18em] text-indigo-400 sm:block">
+                    OAU Edition
+                  </span>
+                </div>
               </button>
 
               <div className="hidden w-full max-w-md md:block">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
+                  <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                   <input
-                    type="text"
+                    type="search"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search your forms..."
-                    className="w-full rounded-lg border border-slate-200 bg-slate-100/80 py-2 pl-9 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search your questionnaires..."
+                    className="w-full rounded-xl border border-slate-800 bg-slate-900/90 py-2.5 pl-10 pr-4 text-xs text-slate-200 outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
                   />
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => createForm()}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-2.5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-700 sm:px-4 sm:text-sm"
+                  className="flex cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-500 sm:px-3.5"
                 >
-                  <Plus className="h-4 w-4 shrink-0" />
-
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Create New Form</span>
                   <span className="sm:hidden">New</span>
-                  <span className="hidden sm:inline">New Form</span>
                 </button>
 
                 {session.user?.image ? (
                   <img
                     src={session.user.image}
                     alt={session.user.name || "User"}
-                    className="h-8 w-8 shrink-0 rounded-full object-cover sm:h-9 sm:w-9"
+                    className="h-9 w-9 shrink-0 rounded-full border border-slate-700 object-cover"
                   />
                 ) : (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700 sm:h-9 sm:w-9">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-sm font-semibold text-indigo-300">
                     {session.user?.name?.charAt(0)?.toUpperCase() || "U"}
                   </div>
                 )}
@@ -250,7 +315,7 @@ export default function HomePage() {
                   onClick={() => signOut()}
                   title="Sign Out"
                   aria-label="Sign Out"
-                  className="cursor-pointer rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="cursor-pointer rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-rose-400"
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
@@ -259,57 +324,134 @@ export default function HomePage() {
 
             <div className="pb-3 md:hidden">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <input
-                  type="text"
+                  type="search"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search your forms..."
-                  className="w-full rounded-lg border border-slate-200 bg-slate-100/80 py-2.5 pl-9 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search your questionnaires..."
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900/90 py-2.5 pl-10 pr-4 text-xs text-slate-200 outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
                 />
               </div>
             </div>
           </div>
-        </nav>
+        </header>
 
-        <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-8">
-          <section>
-            <div className="mb-5">
-              <h1 className="text-xl font-bold text-slate-900">
-                Start with a Template
-              </h1>
+        {/* Dashboard Body */}
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10">
+          {/* Quick Metrics Bar */}
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-slate-400">
+                  Total Forms
+                </p>
+                <FileText className="h-4 w-4 text-indigo-400" />
+              </div>
+              <p className="mt-3 text-2xl font-bold text-white">
+                {forms.length}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Your questionnaires</p>
+            </div>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Choose a template or start with a blank form.
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-slate-400">
+                  Total Submissions
+                </p>
+                <Activity className="h-4 w-4 text-emerald-400" />
+              </div>
+              <p className="mt-3 text-2xl font-bold text-white">
+                {totalSubmissions}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Responses collected</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-slate-400">
+                  Domain Gate
+                </p>
+                <Shield className="h-4 w-4 text-purple-400" />
+              </div>
+              <p className="mt-3 break-all text-sm font-semibold text-white">
+                @student.oauife.edu.ng
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Institutional access
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {templates.map((template) => {
-                const Icon = template.icon;
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-slate-400">
+                  System Status
+                </p>
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                </span>
+              </div>
+              <p className="mt-3 text-lg font-bold text-emerald-400">
+                Operational
+              </p>
+              <p className="mt-1 text-xs text-slate-500">All systems ready</p>
+            </div>
+          </section>
+
+          {/* Templates Section */}
+          <section className="mt-10 sm:mt-12">
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400">
+                Quick Start
+              </p>
+              <h1 className="mt-2 text-xl font-bold text-white sm:text-2xl">
+                Launch with a Specialized Preset
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                Pre-configured fields optimized for Great Ife student surveys
+                and campus research.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {templates.map((tpl) => {
+                const Icon = tpl.icon;
 
                 return (
                   <button
-                    key={template.title}
+                    key={tpl.title}
                     type="button"
-                    onClick={() => createForm(template.title)}
-                    className="group flex min-h-[170px] cursor-pointer flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:-translate-y-0.5 hover:shadow-md"
+                    onClick={() => createForm(tpl.title)}
+                    className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-slate-700 hover:bg-slate-900/80 hover:shadow-xl hover:shadow-black/10"
                   >
                     <div
-                      className={`mb-6 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border ${template.color}`}
-                    >
-                      <Icon className="h-5 w-5" />
+                      className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${tpl.accent}`}
+                    />
+
+                    <div className="flex items-start justify-between gap-3">
+                      <div
+                        className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${tpl.accent} text-white shadow-lg`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <span className="rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[10px] font-semibold text-slate-300">
+                        {tpl.badge}
+                      </span>
                     </div>
 
-                    <div>
-                      <h2 className="font-semibold text-slate-800">
-                        {template.title}
+                    <div className="mt-7">
+                      <h2 className="text-base font-semibold text-white">
+                        {tpl.title}
                       </h2>
-
-                      <p className="mt-1 text-sm leading-5 text-slate-500">
-                        {template.desc}
+                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                        {tpl.desc}
                       </p>
+                    </div>
+
+                    <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-indigo-400 transition group-hover:text-indigo-300">
+                      Use Template
+                      <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" />
                     </div>
                   </button>
                 );
@@ -317,96 +459,126 @@ export default function HomePage() {
             </div>
           </section>
 
-          <section className="mt-10">
+          {/* Forms List Section */}
+          <section className="mt-10 sm:mt-12">
             <div className="mb-5">
-              <h2 className="text-xl font-bold text-slate-900">Your Forms</h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                {filteredForms.length}{" "}
-                {filteredForms.length === 1 ? "form" : "forms"}
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400">
+                Workspace
+              </p>
+              <h2 className="mt-2 text-xl font-bold text-white sm:text-2xl">
+                Your Deployed Questionnaires
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Manage active forms, view submission tallies, and access
+                respondent links.
               </p>
             </div>
 
             {loadingForms ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 sm:p-10">
-                Loading your forms...
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-10 text-center">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+                <p className="mt-4 text-sm text-slate-400">
+                  Fetching campus questionnaires...
+                </p>
               </div>
             ) : filteredForms.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center sm:p-12">
-                <FileText className="mx-auto h-10 w-10 text-slate-300" />
+              <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 px-5 py-12 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800 text-slate-400">
+                  <FileText className="h-6 w-6" />
+                </div>
 
-                <h3 className="mt-4 font-semibold text-slate-800">
-                  No forms yet
+                <h3 className="mt-4 text-base font-semibold text-white">
+                  {searchQuery
+                    ? "No matching forms found"
+                    : "No questionnaires deployed yet"}
                 </h3>
 
-                <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500">
+                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-400">
                   {searchQuery
-                    ? "No forms matched your search criteria."
-                    : "Create your first form to start gathering responses."}
+                    ? `No forms matched "${searchQuery}". Clear your search query to see all records.`
+                    : "Create your first questionnaire to start collecting campus responses and live statistics."}
                 </p>
 
                 {!searchQuery && (
                   <button
                     type="button"
                     onClick={() => createForm()}
-                    className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-indigo-700"
+                    className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-500"
                   >
                     <Plus className="h-4 w-4" />
-                    Create Form
+                    Create Blank Form
                   </button>
                 )}
               </div>
             ) : (
               <div className="space-y-3">
                 {filteredForms.map((form) => (
-                  <div
+                  <article
                     key={form.id}
-                    className="rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-sm sm:p-5"
+                    className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 transition hover:border-slate-700 hover:bg-slate-900/90 sm:p-5"
                   >
-                    <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="min-w-0 flex-1">
                         <button
                           type="button"
                           onClick={() => router.push(`/builder/${form.id}`)}
-                          className="block max-w-full cursor-pointer truncate text-left text-sm font-semibold text-slate-800 transition hover:text-indigo-600"
+                          className="block max-w-full cursor-pointer truncate text-left text-sm font-semibold text-white transition-colors hover:text-indigo-400"
                         >
                           {form.title}
                         </button>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                           <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            className={`rounded-full px-2.5 py-1 font-semibold ${
                               form.published
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-amber-50 text-amber-700"
+                                ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                                : "border border-amber-500/20 bg-amber-500/10 text-amber-400"
                             }`}
                           >
-                            {form.published ? "Active" : "Draft"}
+                            {form.published ? "Live" : "Draft"}
                           </span>
 
-                          <span className="text-xs text-slate-400">
+                          <span className="text-slate-400">
                             {form._count?.responses ?? 0}{" "}
                             {(form._count?.responses ?? 0) === 1
                               ? "response"
                               : "responses"}
                           </span>
+
+                          <span className="text-slate-600">•</span>
+
+                          <span className="inline-flex items-center gap-1 text-slate-500">
+                            <Clock className="h-3 w-3" />
+                            {new Date(form.createdAt).toLocaleDateString()}
+                          </span>
                         </div>
 
-                        <p className="mt-2 break-words text-sm leading-5 text-slate-500 sm:truncate">
-                          {form.description || "No description provided."}
-                        </p>
+                        {form.description && (
+                          <p className="mt-2 break-words text-xs leading-5 text-slate-400">
+                            {form.description}
+                          </p>
+                        )}
                       </div>
 
-                      <div className="flex shrink-0 items-center justify-end gap-1 border-t border-slate-100 pt-3 sm:border-0 sm:pt-0">
+                      <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3 lg:shrink-0 lg:border-0 lg:pt-0">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/builder/${form.id}`)}
+                          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-800/60 px-3 py-2.5 text-xs font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white sm:flex-none"
+                        >
+                          Manage & Builder
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => copyShareLink(form.id)}
-                          title="Copy Link"
-                          aria-label={`Copy share link for ${form.title}`}
-                          className="cursor-pointer rounded-md p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                          title="Copy Public Link"
+                          aria-label={`Copy public link for ${form.title}`}
+                          className="cursor-pointer rounded-xl border border-slate-800 bg-slate-800/60 p-2.5 text-slate-300 transition hover:bg-slate-800 hover:text-white"
                         >
                           {copiedId === form.id ? (
-                            <Check className="h-4 w-4 text-emerald-600" />
+                            <Check className="h-4 w-4 text-emerald-400" />
                           ) : (
                             <Copy className="h-4 w-4" />
                           )}
@@ -416,25 +588,25 @@ export default function HomePage() {
                           href={`/f/${form.id}`}
                           target="_blank"
                           rel="noreferrer"
-                          title="Open Form"
-                          aria-label={`Open ${form.title}`}
-                          className="rounded-md p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                          title="Open Public Form"
+                          aria-label={`Open public form for ${form.title}`}
+                          className="rounded-xl border border-slate-800 bg-slate-800/60 p-2.5 text-slate-300 transition hover:bg-slate-800 hover:text-white"
                         >
-                          <ArrowRight className="h-4 w-4" />
+                          <ExternalLink className="h-4 w-4" />
                         </a>
 
                         <button
                           type="button"
                           onClick={() => deleteForm(form.id)}
-                          title="Delete Form"
+                          title="Delete Questionnaire"
                           aria-label={`Delete ${form.title}`}
-                          className="cursor-pointer rounded-md p-2.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                          className="cursor-pointer rounded-xl border border-slate-800 bg-slate-800/60 p-2.5 text-slate-400 transition hover:border-rose-500/20 hover:bg-rose-500/10 hover:text-rose-400"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             )}
@@ -444,88 +616,41 @@ export default function HomePage() {
     );
   }
 
-  const faqs: FaqItem[] = [
-    {
-      q: "Is FormCraft free to use?",
-      a: "Yes. FormCraft allows you to create unlimited forms, share public submission links, and view aggregated response statistics.",
-    },
-    {
-      q: "Do respondents need a Google account to fill out forms?",
-      a: "No. Anyone with your public link can submit responses immediately without creating an account.",
-    },
-    {
-      q: "Can I export responses to CSV?",
-      a: "Yes. The responses tab includes 1-click CSV export so you can analyze submissions in Excel or Google Sheets.",
-    },
-    {
-      q: "Can I limit submissions per respondent?",
-      a: "Yes, you can toggle submission limits and restrict responses inside the Form Settings tab.",
-    },
-  ];
-
-  const answerOptions = [
-    "Extremely seamless",
-    "Straightforward",
-    "Neutral",
-    "Needs optimization",
-  ];
-
-  const analytics = [
-    {
-      label: "Extremely seamless",
-      percent: 64,
-      count: 82,
-      color: "bg-indigo-600",
-    },
-    {
-      label: "Straightforward",
-      percent: 22,
-      count: 28,
-      color: "bg-indigo-400",
-    },
-    {
-      label: "Neutral",
-      percent: 10,
-      count: 13,
-      color: "bg-slate-400",
-    },
-    {
-      label: "Needs optimization",
-      percent: 4,
-      count: 5,
-      color: "bg-amber-400",
-    },
-  ];
-
+  // ==========================================
+  // PUBLIC MARKETING LANDING PAGE VIEW
+  // ==========================================
   return (
-    <main className="min-h-screen overflow-x-hidden bg-white text-slate-800">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-4 sm:px-6 sm:py-5">
-          <button
-            type="button"
-            onClick={() =>
-              window.scrollTo({
-                top: 0,
-                behavior: "smooth",
-              })
-            }
-            className="flex min-w-0 shrink-0 cursor-pointer items-center gap-2"
-            aria-label="Go to top"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white sm:h-9 sm:w-9 sm:text-sm">
+    <main className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100">
+      {/* Ambient Lighting & Mesh */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-40 -top-40 h-[30rem] w-[30rem] rounded-full bg-indigo-600/15 blur-3xl" />
+        <div className="absolute right-0 top-1/4 h-[28rem] w-[28rem] rounded-full bg-purple-600/10 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-[25rem] w-[25rem] rounded-full bg-cyan-500/5 blur-3xl" />
+      </div>
+
+      {/* Top Header */}
+      <header className="relative z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-4 sm:px-6 sm:py-5">
+          <Link href="/" className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-xs font-bold text-white shadow-lg shadow-indigo-600/20">
               FC
             </div>
 
-            <span className="text-sm font-bold text-slate-900 sm:text-base">
-              FormCraft
-            </span>
-          </button>
+            <div className="min-w-0">
+              <span className="block text-sm font-bold text-white sm:text-base">
+                FormCraft
+              </span>
+              <span className="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500 sm:block">
+                OAU Student SaaS
+              </span>
+            </div>
+          </Link>
 
-          <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <button
               type="button"
               onClick={() => signIn("google")}
-              className="cursor-pointer rounded-lg px-2 py-2 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 sm:px-3 sm:text-xs"
+              className="cursor-pointer rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-900 hover:text-white sm:px-3.5"
             >
               Sign In
             </button>
@@ -533,352 +658,316 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => signIn("google")}
-              className="flex cursor-pointer items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 sm:gap-1.5 sm:px-4 sm:text-xs"
+              className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-500 sm:px-4"
             >
               <span className="sm:hidden">Start</span>
               <span className="hidden sm:inline">Get Started</span>
-              <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Floating glass navigation */}
-      <nav
-        className="fixed left-1/2 top-[76px] z-[100] flex w-[calc(100%-1rem)] max-w-[440px] -translate-x-1/2 overflow-x-auto rounded-full border border-white/60 bg-white/55 p-1 shadow-lg shadow-slate-900/10 backdrop-blur-xl backdrop-saturate-150 sm:top-[88px] sm:w-fit sm:max-w-[calc(100%-2rem)]"
-        style={{
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-        }}
-        aria-label="Page sections"
-      >
-        <div className="mx-auto flex shrink-0 items-center gap-1">
-          {["Create", "Customize", "Analyze", "Security", "FAQs"].map(
-            (item) => (
-              <a
-                key={item}
-                href={`#${item.toLowerCase()}`}
-                className="whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-medium text-slate-700 transition hover:bg-white/60 hover:text-slate-950 sm:px-4 sm:text-xs"
-              >
-                {item}
-              </a>
-            ),
-          )}
-        </div>
-      </nav>
-
-      <section className="mx-auto max-w-4xl px-4 pb-16 pt-28 text-center sm:px-6 sm:pb-20 sm:pt-32">
-        <div className="mx-auto mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[11px] font-medium text-indigo-700 sm:text-xs">
-          <Sparkles className="h-3.5 w-3.5 shrink-0" />
-          <span>Simple forms. Smarter workflows.</span>
+      {/* Hero Section */}
+      <section className="relative z-10 mx-auto max-w-5xl px-4 pb-16 pt-16 text-center sm:px-6 sm:pb-24 sm:pt-24">
+        {/* Verification Pill */}
+        <div className="mx-auto inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-400/20 bg-indigo-500/10 px-3.5 py-2 text-[11px] font-medium text-indigo-300 sm:text-xs">
+          <School className="h-3.5 w-3.5 shrink-0" />
+          <span>Configured for Obafemi Awolowo University</span>
         </div>
 
-        <h1 className="text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl sm:leading-tight lg:text-6xl">
-          The Intelligent Standard for Form Creation
+        <h1 className="mx-auto mt-7 max-w-4xl text-4xl font-bold leading-tight tracking-tight text-white sm:mt-8 sm:text-5xl sm:leading-[1.12] lg:text-7xl">
+          The Intelligent Form Suite Built for{" "}
+          <span className="bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
+            Campus Speed
+          </span>
         </h1>
 
-        <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-slate-500 sm:mt-6 sm:text-base sm:leading-7">
-          Craft modern questionnaires, capture live responses, and analyze
-          metrics with zero friction and a clean, responsive workflow built for
-          precision and speed.
+        <p className="mx-auto mt-6 max-w-2xl text-sm leading-7 text-slate-400 sm:text-base sm:leading-8">
+          Replace flat questionnaires with adaptive question logic, real-time
+          response analytics, and automated submission alerts to your verified
+          OAU student account.
         </p>
 
         <button
           type="button"
           onClick={() => signIn("google")}
-          className="mx-auto mt-7 flex w-full max-w-[230px] cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700 sm:mt-8"
+          className="mt-8 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-xl shadow-indigo-600/30 transition hover:scale-[1.02] hover:bg-indigo-500 sm:mx-auto sm:w-auto"
         >
-          Start Building Free
+          Launch FormCraft Free
           <ArrowRight className="h-4 w-4" />
         </button>
-      </section>
 
-      <section
-        id="create"
-        className="scroll-mt-32 bg-slate-50 px-4 py-14 sm:px-6 sm:py-20"
-      >
-        <div className="mx-auto grid max-w-6xl gap-9 lg:grid-cols-2 lg:items-center lg:gap-12">
-          <div>
-            <p className="text-sm font-semibold text-indigo-600">01 · CREATE</p>
+        <p className="mt-4 text-xs leading-5 text-slate-500">
+          Requires official{" "}
+          <span className="text-slate-300">@student.oauife.edu.ng</span> login.
+        </p>
 
-            <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-              Drag & Drop Builder
-            </h2>
+        <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            {
+              icon: Zap,
+              title: "Fast Form Creation",
+              text: "Build and publish in minutes",
+            },
+            {
+              icon: TrendingUp,
+              title: "Live Insights",
+              text: "Understand responses quickly",
+            },
+            {
+              icon: Shield,
+              title: "OAU Access",
+              text: "Designed for the OAU community",
+            },
+          ].map((item) => {
+            const Icon = item.icon;
 
-            <h3 className="mt-5 font-semibold text-slate-800">
-              Adaptive Question Architecture
-            </h3>
-
-            <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base sm:leading-7">
-              Add multiple choice, dropdowns, short responses, linear scales,
-              and date pickers. Reorder questions effortlessly with fluid
-              drag-and-drop.
-            </p>
-          </div>
-
-          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] font-medium text-slate-400 sm:text-xs">
-                Question 1 · Multiple Choice
-              </span>
-
-              <span className="text-[11px] font-medium text-rose-500 sm:text-xs">
-                Required
-              </span>
-            </div>
-
-            <p className="mt-5 text-sm font-semibold leading-5 text-slate-800 sm:text-base">
-              How would you rate your product onboarding experience?
-            </p>
-
-            <div className="mt-4 space-y-2">
-              {answerOptions.map((opt, i) => (
-                <div
-                  key={opt}
-                  className="flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 p-3 text-xs text-slate-600 sm:text-sm"
-                >
-                  <span
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                      i === 0 ? "border-indigo-600" : "border-slate-300"
-                    }`}
-                  >
-                    {i === 0 && (
-                      <span className="block h-1.5 w-1.5 rounded-full bg-indigo-600" />
-                    )}
-                  </span>
-
-                  <span className="min-w-0 break-words">{opt}</span>
+            return (
+              <div
+                key={item.title}
+                className="flex items-center gap-3 rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-left"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-300">
+                  <Icon className="h-5 w-5" />
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="customize"
-        className="scroll-mt-32 px-4 py-14 sm:px-6 sm:py-20"
-      >
-        <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold text-indigo-600">
-              02 · CUSTOMIZE
-            </p>
-
-            <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-              Brand Aesthetics
-            </h2>
-
-            <p className="mt-3 text-sm text-slate-500 sm:text-base">
-              Clean Visual Workspace
-            </p>
-
-            <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base sm:leading-7">
-              Every element is structured for readability, modern ergonomics,
-              and zero distractions.
-            </p>
-          </div>
-
-          <div className="mt-8 grid gap-4 sm:mt-10 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: Palette,
-                title: "Balanced Contrast",
-                text: "Curated slate palette calibrated to reduce fatigue during extended form design sessions.",
-              },
-              {
-                icon: Layers,
-                title: "Drag & Drop Engine",
-                text: "Dnd-kit integration ensures fluid reordering across nested options and field cards.",
-              },
-              {
-                icon: Zap,
-                title: "Instant Preview",
-                text: "Review published respondent interfaces in real time before distributing public links.",
-              },
-              {
-                icon: Shield,
-                title: "Consistent Design",
-                text: "Keep forms visually coherent with reusable components and structured layouts.",
-              },
-            ].map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div
-                  key={item.title}
-                  className="rounded-xl border border-slate-200 bg-white p-5"
-                >
-                  <Icon className="h-5 w-5 text-indigo-600" />
-
-                  <h3 className="mt-4 font-semibold text-slate-800">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-200">
                     {item.title}
-                  </h3>
-
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                  </p>
+                  <p className="mt-1 text-[11px] leading-5 text-slate-500">
                     {item.text}
                   </p>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      <section
-        id="analyze"
-        className="scroll-mt-32 bg-slate-50 px-4 py-14 sm:px-6 sm:py-20"
-      >
-        <div className="mx-auto grid max-w-6xl gap-9 lg:grid-cols-2 lg:items-center lg:gap-12">
-          <div>
-            <p className="text-sm font-semibold text-indigo-600">
-              03 · ANALYZE
+      {/* Bento Grid Feature Showcase */}
+      <section className="relative z-10 border-y border-slate-800/70 bg-slate-900/30 px-4 py-16 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400">
+              Built for better workflows
             </p>
-
-            <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-              Live Insights
+            <h2 className="mt-3 text-2xl font-bold text-white sm:text-3xl lg:text-4xl">
+              Architected to Surpass Conventional Forms
             </h2>
-
-            <h3 className="mt-5 font-semibold text-slate-800">
-              Real-Time Visual Analytics
-            </h3>
-
-            <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base sm:leading-7">
-              Watch response counters populate live. Automatic percentage
-              breakdowns and charts allow you to extract actionable intelligence
-              immediately.
+            <p className="mt-4 text-sm leading-7 text-slate-400 sm:text-base">
+              Engineered with deep visual clarity, intelligent metrics, and zero
+              administrative bloat.
             </p>
           </div>
 
-          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-800">
-                  Response Metrics
-                </p>
+          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:mt-14 lg:grid-cols-3">
+            {/* Card 1: Bento Big */}
+            <article className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/70 p-5 sm:p-7 md:col-span-2">
+              <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl" />
 
-                <p className="mt-1 text-xs text-slate-400">Live preview data</p>
+              <div className="relative grid gap-8 md:grid-cols-2 md:items-center">
+                <div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-300">
+                    <BarChart3 className="h-5 w-5" />
+                  </div>
+
+                  <h3 className="mt-5 text-lg font-bold text-white sm:text-xl">
+                    Live Graphical Visualizations
+                  </h3>
+
+                  <p className="mt-3 text-sm leading-6 text-slate-400">
+                    Tired of raw spreadsheets? FormCraft turns responses into
+                    distribution charts, linear scale averages, and clear
+                    response tallies.
+                  </p>
+                </div>
+
+                {/* Mock Chart Display */}
+                <div className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/80 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-200">
+                        Onboarding Satisfaction
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        Sample analytics preview
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-400">
+                      92% Positive
+                    </span>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    {[
+                      { label: "Excellent", value: 62, color: "bg-indigo-500" },
+                      { label: "Good", value: 30, color: "bg-purple-500" },
+                      { label: "Fair", value: 8, color: "bg-slate-600" },
+                    ].map((item) => (
+                      <div key={item.label}>
+                        <div className="mb-1.5 flex justify-between gap-3 text-[11px]">
+                          <span className="text-slate-400">{item.label}</span>
+                          <span className="text-slate-300">{item.value}%</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                          <div
+                            className={`h-full rounded-full ${item.color}`}
+                            style={{ width: `${item.value}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-4">
+                    <span className="text-[10px] text-slate-500">
+                      142 Respondent Inputs
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      Live Syncing
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            {/* Card 2: AI Summaries */}
+            <article className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 sm:p-7">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/10 text-purple-300">
+                <BrainCircuit className="h-5 w-5" />
               </div>
 
-              <p className="text-xl font-bold text-slate-900 sm:text-2xl">
-                128{" "}
-                <span className="text-xs font-medium sm:text-sm">
-                  Submissions
-                </span>
+              <h3 className="mt-5 text-lg font-bold text-white">
+                AI Executive Synthesizer
+              </h3>
+
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                Transform qualitative feedback into concise sentiment breakdowns
+                and executive summaries when AI analysis is enabled.
               </p>
-            </div>
 
-            <div className="mt-6 space-y-4">
-              {analytics.map((item) => (
-                <div key={item.label}>
-                  <div className="mb-1 flex items-start justify-between gap-3 text-xs">
-                    <span className="min-w-0 break-words text-slate-600">
-                      {item.label}
-                    </span>
+              <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1.5 text-[10px] font-medium text-purple-300">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI-assisted analysis
+              </div>
+            </article>
 
-                    <span className="shrink-0 font-medium text-slate-700">
-                      {item.count} ({item.percent}%)
-                    </span>
+            {/* Card 3: OAU Student Domain Guard */}
+            <article className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 sm:p-7">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
+                <Shield className="h-5 w-5" />
+              </div>
+
+              <h3 className="mt-5 text-lg font-bold text-white">
+                Institutional Security
+              </h3>
+
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                Institutional sign-in helps keep form ownership tied to verified
+                OAU accounts.
+              </p>
+
+              <div className="mt-6 flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <School className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span className="break-all text-[11px] text-slate-300">
+                  @student.oauife.edu.ng
+                </span>
+              </div>
+            </article>
+
+            {/* Card 4: Focus Mode Bento */}
+            <article className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 sm:p-7 md:col-span-2 lg:col-span-2">
+              <div className="grid gap-6 md:grid-cols-2 md:items-center">
+                <div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-amber-300">
+                    <Zap className="h-5 w-5" />
                   </div>
 
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full ${item.color}`}
-                      style={{
-                        width: `${item.percent}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="security"
-        className="scroll-mt-32 px-4 py-14 sm:px-6 sm:py-20"
-      >
-        <div className="mx-auto max-w-6xl">
-          <p className="text-sm font-semibold text-indigo-600">04 · SECURITY</p>
-
-          <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-            Trust & Security
-          </h2>
-
-          <div className="mt-8 grid gap-4 sm:mt-10 md:grid-cols-3">
-            {[
-              {
-                title: "Protected Submissions",
-                text: "Built with strict session integrity and secure database relations.",
-                icon: Shield,
-              },
-              {
-                title: "Google OAuth 2.0",
-                text: "Direct authentication without storing plaintext passwords on your server.",
-                icon: Sparkles,
-              },
-              {
-                title: "Private Records",
-                text: "Respondents submit securely and responses are queryable only by the verified form owner.",
-                icon: FileText,
-              },
-            ].map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div
-                  key={item.title}
-                  className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"
-                >
-                  <Icon className="h-5 w-5 text-indigo-600" />
-
-                  <h3 className="mt-4 font-semibold text-slate-800">
-                    {item.title}
+                  <h3 className="mt-5 text-lg font-bold text-white">
+                    Step-by-Step Focus Mode
                   </h3>
 
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    {item.text}
+                  <p className="mt-3 text-sm leading-6 text-slate-400">
+                    Keep respondents focused with a clean, one-question-at-a-
+                    time experience where supported by your form layout.
                   </p>
                 </div>
-              );
-            })}
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-medium text-slate-500">
+                      QUESTION 03 OF 08
+                    </span>
+                    <span className="text-[10px] text-indigo-300">38%</span>
+                  </div>
+
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                    <div className="h-full w-[38%] rounded-full bg-indigo-500" />
+                  </div>
+
+                  <p className="mt-5 text-sm font-semibold leading-6 text-white">
+                    How would you describe your experience?
+                  </p>
+
+                  <div className="mt-4 space-y-2">
+                    {["Excellent", "Good", "Fair"].map((option, index) => (
+                      <div
+                        key={option}
+                        className={`rounded-xl border px-3 py-2.5 text-xs ${
+                          index === 0
+                            ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-200"
+                            : "border-slate-800 bg-slate-900/70 text-slate-400"
+                        }`}
+                      >
+                        {option}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </article>
           </div>
         </div>
       </section>
 
-      <section
-        id="faqs"
-        className="scroll-mt-32 bg-slate-50 px-4 py-14 sm:px-6 sm:py-20"
-      >
+      {/* FAQ Section */}
+      <section className="relative z-10 px-4 py-16 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-3xl">
-          <p className="text-sm font-semibold text-indigo-600">05 · FAQ</p>
+          <div className="text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400">
+              Need to know
+            </p>
+            <h2 className="mt-3 text-2xl font-bold text-white sm:text-3xl">
+              Frequently Asked Questions
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-400">
+              Key questions regarding FormCraft capabilities and student access.
+            </p>
+          </div>
 
-          <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-            Frequently Asked Questions
-          </h2>
-
-          <div className="mt-7 divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white sm:mt-8">
+          <div className="mt-8 divide-y divide-slate-800 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60">
             {faqs.map((faq, idx) => (
               <div key={faq.q}>
                 <button
                   type="button"
-                  onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
-                  className="flex w-full cursor-pointer items-start justify-between gap-4 px-4 py-4 text-left text-sm font-medium leading-6 text-slate-800 transition hover:bg-slate-50 sm:px-5"
+                  onClick={() =>
+                    setActiveFaq((current) => (current === idx ? null : idx))
+                  }
                   aria-expanded={activeFaq === idx}
+                  className="flex w-full cursor-pointer items-center justify-between gap-4 p-4 text-left text-xs font-semibold text-slate-200 transition hover:bg-slate-900 hover:text-white sm:p-5 sm:text-sm"
                 >
-                  <span className="min-w-0">{faq.q}</span>
-
+                  <span>{faq.q}</span>
                   <ChevronDown
-                    className={`mt-1 h-4 w-4 shrink-0 transition-transform ${
+                    className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
                       activeFaq === idx ? "rotate-180" : ""
                     }`}
                   />
                 </button>
 
                 {activeFaq === idx && (
-                  <div className="px-4 pb-5 text-sm leading-6 text-slate-500 sm:px-5">
+                  <div className="px-4 pb-5 text-xs leading-6 text-slate-400 sm:px-5 sm:text-sm">
                     {faq.a}
                   </div>
                 )}
@@ -888,20 +977,32 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 bg-white px-4 py-8 sm:px-6 sm:py-10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
-            FC
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-slate-800 bg-slate-950/80 px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-xs font-bold text-white">
+              FC
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-200">
+                FormCraft • Obafemi Awolowo University
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                © {new Date().getFullYear()} FormCraft. Engineered for academic
+                research and survey workflows.
+              </p>
+            </div>
           </div>
 
-          <div>
-            <p className="font-semibold text-slate-800">FormCraft</p>
-
-            <p className="text-xs leading-5 text-slate-400">
-              © {new Date().getFullYear()} FormCraft. Engineered for modern
-              feedback and workflows.
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => signIn("google")}
+            className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:border-slate-700 hover:text-white sm:w-auto"
+          >
+            Get Started
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
         </div>
       </footer>
     </main>
