@@ -4,8 +4,6 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI();
-
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
@@ -51,6 +49,17 @@ export async function POST(_req: Request, { params }: RouteContext) {
       );
     }
 
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY is not defined in environment variables.");
+      return NextResponse.json(
+        { error: "GEMINI_API_KEY is not configured on the server." },
+        { status: 500 },
+      );
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
     let parsedQuestions: Array<{ id: string; title: string; type: string }> =
       [];
     try {
@@ -64,7 +73,6 @@ export async function POST(_req: Request, { params }: RouteContext) {
       questionMap[q.id] = q.title;
     });
 
-    // Format submissions into clean readable text for Gemini
     const formattedSubmissions = form.responses.map((r, index) => {
       let rawAnswers: Record<string, unknown> = {};
       try {
@@ -85,7 +93,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
 
     const prompt = `
 You are an executive data analyst for academic and administrative surveys at Obafemi Awolowo University.
-Analyze the following questionnaire responses for the form: "${form.title}".
+Analyze the following questionnaire responses for the form titled: "${form.title}".
 
 Questionnaire Description: ${form.description || "N/A"}
 Total Responses: ${form.responses.length}
@@ -96,10 +104,11 @@ ${formattedSubmissions.slice(0, 150).join("\n")}
 Respond ONLY with a valid JSON object matching this exact schema:
 {
   "summary": "A concise 2-3 sentence overview of respondent sentiment and results.",
-  "sentiment": "Positive" | "Neutral" | "Negative" | "Mixed",
+  "sentiment": "Positive",
   "keyFindings": ["Finding 1", "Finding 2", "Finding 3"],
   "recommendations": ["Recommendation 1", "Recommendation 2"]
 }
+Note for sentiment: Choose one of "Positive", "Neutral", "Negative", or "Mixed".
 `;
 
     const response = await ai.models.generateContent({
@@ -114,11 +123,14 @@ Respond ONLY with a valid JSON object matching this exact schema:
     const insights = JSON.parse(responseText);
 
     return NextResponse.json({ success: true, insights });
-  } catch (error) {
-    console.error("AI Insights generation error:", error);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to generate AI insights.";
+    console.error("AI Insights backend error:", errorMessage);
     return NextResponse.json(
       {
         error:
+          errorMessage ||
           "Failed to generate AI insights. Please check your Gemini configuration.",
       },
       { status: 500 },

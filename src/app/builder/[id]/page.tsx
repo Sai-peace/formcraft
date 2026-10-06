@@ -11,14 +11,14 @@ import {
   Edit3,
   Download,
   RefreshCw,
-  Palette,
+  Share2,
   Sparkles,
   Bot,
   BrainCircuit,
   TrendingUp,
   AlertCircle,
   Lightbulb,
-  Share2,
+  ExternalLink,
 } from "lucide-react";
 import ShareModal from "@/components/ShareModal";
 import {
@@ -41,54 +41,12 @@ import SortableQuestionCard, {
 } from "@/components/SortableQuestionCard";
 
 const THEME_OPTIONS = [
-  {
-    id: "indigo",
-    name: "Royal Indigo",
-    color: "#4f46e5",
-    bg: "bg-indigo-600",
-    border: "border-indigo-600",
-    light: "bg-indigo-50",
-  },
-  {
-    id: "emerald",
-    name: "Emerald Forest",
-    color: "#059669",
-    bg: "bg-emerald-600",
-    border: "border-emerald-600",
-    light: "bg-emerald-50",
-  },
-  {
-    id: "violet",
-    name: "Deep Violet",
-    color: "#7c3aed",
-    bg: "bg-violet-600",
-    border: "border-violet-600",
-    light: "bg-violet-50",
-  },
-  {
-    id: "amber",
-    name: "Warm Amber",
-    color: "#d97706",
-    bg: "bg-amber-600",
-    border: "border-amber-600",
-    light: "bg-amber-50",
-  },
-  {
-    id: "rose",
-    name: "Crimson Rose",
-    color: "#e11d48",
-    bg: "bg-rose-600",
-    border: "border-rose-600",
-    light: "bg-rose-50",
-  },
-  {
-    id: "slate",
-    name: "Minimal Slate",
-    color: "#1e293b",
-    bg: "bg-slate-800",
-    border: "border-slate-800",
-    light: "bg-slate-100",
-  },
+  { id: "indigo", name: "Royal Indigo", color: "#4f46e5" },
+  { id: "emerald", name: "Emerald Forest", color: "#059669" },
+  { id: "violet", name: "Deep Violet", color: "#7c3aed" },
+  { id: "amber", name: "Warm Amber", color: "#d97706" },
+  { id: "rose", name: "Crimson Rose", color: "#e11d48" },
+  { id: "slate", name: "Minimal Slate", color: "#1e293b" },
 ];
 
 interface FormData {
@@ -132,6 +90,10 @@ type AnswerValue =
   | undefined;
 
 type AnswersMap = Record<string, AnswerValue>;
+
+interface ParsedResponse extends RawResponse {
+  data: AnswersMap;
+}
 
 export default function BuilderPage({
   params,
@@ -201,7 +163,7 @@ export default function BuilderPage({
           setSavedSuccess(false);
         }, 2000);
       } else {
-        console.error("Failed to save form:", await res.text().catch(() => ""));
+        console.error("Failed to save form:", await res.text());
       }
     } catch (error) {
       console.error("Failed to save form:", error);
@@ -255,17 +217,29 @@ export default function BuilderPage({
         method: "POST",
       });
 
-      const data = await res.json();
+      const data: {
+        error?: string;
+        insights?: AiInsightsData;
+      } = await res.json();
 
       if (!res.ok) {
         setAiError(data.error || "Failed to generate AI insights.");
         return;
       }
 
-      setAiInsights(data.insights as AiInsightsData);
+      if (!data.insights) {
+        setAiError("AI returned no insights.");
+        return;
+      }
+
+      setAiInsights(data.insights);
     } catch (error) {
-      console.error("AI Insight Error:", error);
-      setAiError("Failed to communicate with AI synthesizer.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to communicate with AI synthesizer.";
+
+      setAiError(message);
     } finally {
       setGeneratingAi(false);
     }
@@ -302,6 +276,10 @@ export default function BuilderPage({
         }
       } catch (error) {
         console.error("Failed to load form:", error);
+
+        if (!ignore) {
+          router.push("/");
+        }
       }
     }
 
@@ -329,6 +307,7 @@ export default function BuilderPage({
           if (!ignore) {
             setResponses([]);
           }
+
           return;
         }
 
@@ -338,8 +317,9 @@ export default function BuilderPage({
           setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
         }
       } catch (error) {
+        console.error("Failed to load responses:", error);
+
         if (!ignore) {
-          console.error("Failed to fetch responses:", error);
           setResponses([]);
         }
       } finally {
@@ -423,7 +403,7 @@ export default function BuilderPage({
   const exportToCSV = () => {
     if (responses.length === 0) return;
 
-    const escapeCSV = (value: unknown) => {
+    const escapeCSV = (value: unknown): string => {
       const text = value === null || value === undefined ? "" : String(value);
 
       return `"${text.replace(/"/g, '""')}"`;
@@ -491,16 +471,16 @@ export default function BuilderPage({
 
   if (!form) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-slate-500">Loading workspace...</p>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+          <span className="text-xs">Loading workspace...</span>
         </div>
-      </main>
+      </div>
     );
   }
 
-  const parsedResponses = responses.map((response) => {
+  const parsedResponses: ParsedResponse[] = responses.map((response) => {
     try {
       const parsed: unknown =
         typeof response.answers === "string"
@@ -512,12 +492,12 @@ export default function BuilderPage({
         data:
           parsed && typeof parsed === "object" && !Array.isArray(parsed)
             ? (parsed as AnswersMap)
-            : ({} as AnswersMap),
+            : {},
       };
     } catch {
       return {
         ...response,
-        data: {} as AnswersMap,
+        data: {},
       };
     }
   });
@@ -526,22 +506,27 @@ export default function BuilderPage({
     responses.length > 0 ? responses.length : (form._count?.responses ?? 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="h-16 flex items-center justify-between gap-3">
+    <div className="min-h-screen bg-slate-950 text-white">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
+      </div>
+
+      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
                 onClick={() => router.push("/")}
-                className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition shrink-0 cursor-pointer"
+                className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
                 title="Return to Dashboard"
-                aria-label="Return to Dashboard"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
 
               <input
+                type="text"
                 value={form.title}
                 onChange={(event) => {
                   const updated = {
@@ -552,29 +537,29 @@ export default function BuilderPage({
                   setForm(updated);
                   void saveForm(questions, updated);
                 }}
-                className="font-semibold text-slate-900 text-sm sm:text-base bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-600 outline-none pb-0.5 w-44 sm:w-72 transition truncate"
+                className="font-bold text-white text-sm sm:text-base bg-transparent border-b border-transparent hover:border-slate-700 focus:border-indigo-500 outline-none pb-0.5 w-44 sm:w-72 transition truncate"
                 aria-label="Form title"
               />
-            </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="hidden md:flex items-center text-[11px] text-slate-400 mr-1">
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] text-slate-500 whitespace-nowrap">
                 {isSaving ? (
                   "Saving..."
                 ) : savedSuccess ? (
-                  <span className="text-emerald-600 flex items-center gap-1">
-                    <Check className="w-3 h-3" />
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
                     Saved
-                  </span>
+                  </>
                 ) : (
                   "All changes saved"
                 )}
-              </div>
+              </span>
+            </div>
 
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsShareOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition cursor-pointer shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-md shadow-indigo-600/20"
               >
                 <Share2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Share</span>
@@ -583,43 +568,48 @@ export default function BuilderPage({
               <button
                 type="button"
                 onClick={() => void togglePublishStatus()}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium transition cursor-pointer"
+                className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition cursor-pointer ${
+                  form.published
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                    : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
+                }`}
               >
-                {form.published ? "Unpublish Form" : "Publish Form"}
+                {form.published ? "Active (Live)" : "Draft Mode"}
               </button>
 
               <a
                 href={`/f/${formId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium transition"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold transition"
               >
                 View Form
+                <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex items-center gap-1 mt-3 overflow-x-auto pb-1">
             <button
               type="button"
               onClick={() => setActiveTab("builder")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "builder"
-                  ? "bg-indigo-50 text-indigo-600"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <Edit3 className="w-3.5 h-3.5" />
-              Builder
+              Question Architecture
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab("responses")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "responses"
-                  ? "bg-indigo-50 text-indigo-600"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5" />
@@ -629,38 +619,25 @@ export default function BuilderPage({
             <button
               type="button"
               onClick={() => setActiveTab("settings")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "settings"
-                  ? "bg-indigo-50 text-indigo-600"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <Sliders className="w-3.5 h-3.5" />
-              Settings
+              Rules & Settings
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {activeTab === "builder" && (
           <div className="space-y-5">
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Form Builder
-                  </h2>
-                  <p className="text-[11px] text-slate-400">
-                    Create and arrange your questions.
-                  </p>
-                </div>
-              </div>
-
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl">
               <input
+                type="text"
                 value={form.title}
                 onChange={(event) => {
                   const updated = {
@@ -672,7 +649,7 @@ export default function BuilderPage({
                   void saveForm(questions, updated);
                 }}
                 placeholder="Form Title"
-                className="w-full text-xl font-bold text-slate-900 border-b border-transparent hover:border-slate-200 focus:border-indigo-500 outline-none pb-1 transition mb-2"
+                className="w-full text-2xl font-extrabold text-white border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none pb-1 transition mb-3"
               />
 
               <textarea
@@ -688,7 +665,7 @@ export default function BuilderPage({
                 }}
                 placeholder="Form description or instructions for respondents..."
                 rows={2}
-                className="w-full text-xs text-slate-600 border-b border-transparent hover:border-slate-200 focus:border-indigo-500 outline-none transition resize-none"
+                className="w-full text-xs text-slate-400 border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none transition resize-none"
               />
             </div>
 
@@ -718,41 +695,43 @@ export default function BuilderPage({
             <button
               type="button"
               onClick={addQuestion}
-              className="w-full py-3 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/30 rounded-xl text-slate-600 hover:text-indigo-600 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              className="w-full py-4 border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              Add Question
+              <Plus className="w-4 h-4 text-indigo-400" />
+              Add Question Card
             </button>
           </div>
         )}
 
         {activeTab === "responses" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl">
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base font-bold text-white">
                   {responses.length}{" "}
-                  {responses.length === 1 ? "Response" : "Responses"}
+                  {responses.length === 1 ? "Response" : "Responses"} Recorded
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Live submission records & analytics
+
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Live submission feed and synthesis
                 </p>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => void generateAiInsights()}
+                  onClick={generateAiInsights}
                   disabled={generatingAi || responses.length === 0}
-                  className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-purple-600/20 cursor-pointer disabled:cursor-not-allowed"
+                  className="bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-lg shadow-purple-600/20 cursor-pointer disabled:cursor-not-allowed"
                 >
                   <Bot
-                    className={`w-3.5 h-3.5 ${
-                      generatingAi ? "animate-spin" : ""
-                    }`}
+                    className={`w-4 h-4 ${generatingAi ? "animate-spin" : ""}`}
                   />
+
                   <span>
-                    {generatingAi ? "Analyzing..." : "AI Executive Summary"}
+                    {generatingAi
+                      ? "Synthesizing with Gemini..."
+                      : "AI Executive Summary"}
                   </span>
                 </button>
 
@@ -761,49 +740,50 @@ export default function BuilderPage({
                   onClick={() => void fetchResponses()}
                   disabled={loadingResponses}
                   title="Refresh responses"
-                  className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="p-2 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${
                       loadingResponses ? "animate-spin" : ""
                     }`}
                   />
-                  <span className="hidden sm:inline">Refresh</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={exportToCSV}
                   disabled={responses.length === 0}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:cursor-not-allowed"
+                  className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download CSV</span>
+                  <span>Export CSV</span>
                 </button>
               </div>
             </div>
 
             {aiError && (
-              <div className="flex items-start gap-2.5 p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{aiError}</span>
+              <div className="flex items-start gap-2.5 p-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <span className="leading-relaxed">{aiError}</span>
               </div>
             )}
 
             {aiInsights && (
-              <div className="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/50 p-6 shadow-sm relative overflow-hidden">
+              <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-600/20">
-                      <BrainCircuit className="h-4 w-4" />
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-xl bg-purple-600/30 border border-purple-500/30 text-purple-300 flex items-center justify-center">
+                      <BrainCircuit className="h-5 w-5" />
                     </div>
 
                     <div>
-                      <h4 className="font-bold text-slate-900 text-sm">
+                      <h4 className="font-bold text-white text-sm">
                         AI Executive Synthesis
                       </h4>
-                      <p className="text-[11px] text-slate-500">
-                        Synthesized across {responses.length} respondent entries
+
+                      <p className="text-[11px] text-slate-400">
+                        Synthesized across {responses.length} responses with
+                        Gemini
                       </p>
                     </div>
                   </div>
@@ -811,24 +791,24 @@ export default function BuilderPage({
                   <span
                     className={`self-start sm:self-auto px-3 py-1 rounded-full text-xs font-semibold border ${
                       aiInsights.sentiment === "Positive"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                         : aiInsights.sentiment === "Negative"
-                          ? "bg-rose-50 text-rose-700 border-rose-200"
-                          : "bg-amber-50 text-amber-700 border-amber-200"
+                          ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                     }`}
                   >
                     {aiInsights.sentiment} Sentiment
                   </span>
                 </div>
 
-                <p className="text-xs leading-relaxed text-slate-700 mb-5 bg-white/70 border border-purple-100 rounded-xl p-3.5">
+                <p className="text-xs leading-relaxed text-slate-200 mb-5 bg-slate-950/60 border border-slate-800 rounded-2xl p-4">
                   {aiInsights.summary}
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white/80 border border-purple-100/80 rounded-xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-900 mb-2.5">
-                      <TrendingUp className="h-3.5 w-3.5 text-purple-600" />
+                  <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 mb-2.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-purple-400" />
                       <span>Consensus & Trends</span>
                     </div>
 
@@ -836,31 +816,33 @@ export default function BuilderPage({
                       {aiInsights.keyFindings.map((finding, index) => (
                         <li
                           key={`${finding}-${index}`}
-                          className="text-xs text-slate-600 flex items-start gap-2"
+                          className="text-xs text-slate-400 flex items-start gap-2"
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500 mt-1.5 shrink-0" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
                           <span>{finding}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="bg-white/80 border border-purple-100/80 rounded-xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-900 mb-2.5">
-                      <Lightbulb className="h-3.5 w-3.5 text-indigo-600" />
+                  <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300 mb-2.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-indigo-400" />
                       <span>Actionable Next Steps</span>
                     </div>
 
                     <ul className="space-y-2">
-                      {aiInsights.recommendations.map((rec, index) => (
-                        <li
-                          key={`${rec}-${index}`}
-                          className="text-xs text-slate-600 flex items-start gap-2"
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
-                          <span>{rec}</span>
-                        </li>
-                      ))}
+                      {aiInsights.recommendations.map(
+                        (recommendation, index) => (
+                          <li
+                            key={`${recommendation}-${index}`}
+                            className="text-xs text-slate-400 flex items-start gap-2"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                            <span>{recommendation}</span>
+                          </li>
+                        ),
+                      )}
                     </ul>
                   </div>
                 </div>
@@ -868,22 +850,24 @@ export default function BuilderPage({
             )}
 
             {loadingResponses ? (
-              <div className="py-20 text-center text-slate-400 text-sm">
+              <div className="py-20 text-center text-slate-500 text-xs">
                 Fetching response records...
               </div>
             ) : responses.length === 0 ? (
-              <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-12 text-center">
-                <BarChart3 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <h4 className="font-semibold text-slate-800 text-sm">
+              <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-12 text-center">
+                <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+
+                <h4 className="font-semibold text-white text-sm">
                   Waiting for responses
                 </h4>
+
                 <p className="text-xs text-slate-400 mt-1">
                   Share your public form link with respondents to begin
                   collecting data.
                 </p>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {questions.map((question, index) => {
                   const hasOptions = [
                     "multiple_choice",
@@ -921,19 +905,19 @@ export default function BuilderPage({
                     return (
                       <div
                         key={question.id}
-                        className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"
+                        className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm"
                       >
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 gap-3">
-                          <span className="text-xs font-semibold text-slate-800">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                          <span className="text-xs font-semibold text-white">
                             {index + 1}. {question.title}
                           </span>
 
-                          <span className="text-[11px] font-mono text-slate-400 uppercase shrink-0">
+                          <span className="text-[10px] font-mono text-indigo-400 uppercase">
                             {question.type.replace("_", " ")}
                           </span>
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
                           {(question.options || []).map((option) => {
                             const count = counts[option] || 0;
 
@@ -945,20 +929,20 @@ export default function BuilderPage({
                             return (
                               <div
                                 key={option}
-                                className="p-3 rounded-lg bg-slate-50 border border-slate-100"
+                                className="p-3 rounded-xl bg-slate-950/50 border border-slate-800/80"
                               >
-                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-xs font-medium text-slate-800 mb-1.5">
-                                  <span>{option}</span>
+                                <div className="flex justify-between text-xs font-medium text-slate-200 mb-1.5 gap-3">
+                                  <span className="break-words">{option}</span>
 
-                                  <span className="text-indigo-600 font-semibold font-mono">
+                                  <span className="text-indigo-400 font-semibold font-mono shrink-0">
                                     {count} {count === 1 ? "vote" : "votes"} (
                                     {percent}%)
                                   </span>
                                 </div>
 
-                                <div className="w-full h-2.5 bg-slate-200/80 rounded-full overflow-hidden">
+                                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-500"
+                                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
                                     style={{
                                       width: `${percent}%`,
                                     }}
@@ -978,13 +962,17 @@ export default function BuilderPage({
                       (value) =>
                         value !== undefined && value !== null && value !== "",
                     )
-                    .map((value) =>
-                      Array.isArray(value)
-                        ? value.join(", ")
-                        : typeof value === "object"
-                          ? JSON.stringify(value)
-                          : String(value),
-                    );
+                    .map((value) => {
+                      if (Array.isArray(value)) {
+                        return value.join(", ");
+                      }
+
+                      if (typeof value === "object" && value !== null) {
+                        return JSON.stringify(value);
+                      }
+
+                      return String(value);
+                    });
 
                   const completionRate =
                     responses.length > 0
@@ -993,47 +981,48 @@ export default function BuilderPage({
                         )
                       : 0;
 
-                  const uniqueAnswers = new Set(textAnswers).size;
-
                   return (
                     <div
                       key={question.id}
-                      className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"
+                      className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm"
                     >
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 gap-3">
-                        <span className="text-xs font-semibold text-slate-800">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4 gap-3">
+                        <span className="text-xs font-semibold text-white">
                           {index + 1}. {question.title}
                         </span>
 
-                        <span className="text-[11px] font-mono text-slate-400 uppercase shrink-0">
+                        <span className="text-[10px] font-mono text-indigo-400 uppercase shrink-0">
                           {question.type.replace("_", " ")}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                        <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-center">
-                          <div className="text-[10px] uppercase font-semibold text-slate-400">
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 text-center">
+                          <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Total Entries
                           </div>
-                          <div className="text-sm font-bold text-slate-800 mt-0.5">
+
+                          <div className="text-sm font-bold text-white mt-0.5">
                             {textAnswers.length}
                           </div>
                         </div>
 
-                        <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-center">
-                          <div className="text-[10px] uppercase font-semibold text-slate-400">
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 text-center">
+                          <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Unique Answers
                           </div>
-                          <div className="text-sm font-bold text-indigo-600 mt-0.5">
-                            {uniqueAnswers}
+
+                          <div className="text-sm font-bold text-indigo-400 mt-0.5">
+                            {new Set(textAnswers).size}
                           </div>
                         </div>
 
-                        <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-center">
-                          <div className="text-[10px] uppercase font-semibold text-slate-400">
+                        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 text-center">
+                          <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Response Rate
                           </div>
-                          <div className="text-sm font-bold text-emerald-600 mt-0.5">
+
+                          <div className="text-sm font-bold text-emerald-400 mt-0.5">
                             {completionRate}%
                           </div>
                         </div>
@@ -1041,20 +1030,18 @@ export default function BuilderPage({
 
                       <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                         {textAnswers.length === 0 ? (
-                          <div className="text-xs text-slate-400 italic">
+                          <div className="text-xs text-slate-500 italic">
                             No responses recorded for this question.
                           </div>
                         ) : (
                           textAnswers.map((text, responseIndex) => (
                             <div
                               key={`${question.id}-${responseIndex}`}
-                              className="text-xs text-slate-700 bg-slate-50 border border-slate-100 p-2.5 rounded-lg flex items-center justify-between gap-3"
+                              className="text-xs text-slate-300 bg-slate-950/50 border border-slate-800/80 p-3 rounded-xl flex items-center justify-between gap-3"
                             >
-                              <span className="break-words min-w-0">
-                                {text}
-                              </span>
+                              <span className="break-words">{text}</span>
 
-                              <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                              <span className="text-[10px] text-slate-500 font-mono shrink-0">
                                 #{responseIndex + 1}
                               </span>
                             </div>
@@ -1071,60 +1058,53 @@ export default function BuilderPage({
 
         {activeTab === "settings" && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <div>
-                <h3 className="font-semibold text-slate-800 text-base flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-indigo-600" />
+                <h3 className="font-bold text-white text-base">
                   Respondent Color Theme
                 </h3>
 
                 <p className="text-xs text-slate-400 mt-1">
-                  Choose the brand color used for accents, top border strips,
-                  radio buttons, and submit buttons on the public respondent
-                  view.
+                  Choose the brand accent color used on public respondent views.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {THEME_OPTIONS.map((th) => {
-                  const isSelected = (form.theme || "indigo") === th.id;
+                {THEME_OPTIONS.map((theme) => {
+                  const isSelected = (form.theme || "indigo") === theme.id;
 
                   return (
                     <button
-                      key={th.id}
+                      key={theme.id}
                       type="button"
                       onClick={() => {
                         const updated = {
                           ...form,
-                          theme: th.id,
+                          theme: theme.id,
                         };
 
                         setForm(updated);
                         void saveForm(questions, updated);
                       }}
-                      className={`p-3 rounded-xl border flex items-center gap-3 transition cursor-pointer text-left ${
+                      className={`p-3 rounded-2xl border flex items-center gap-3 transition cursor-pointer text-left ${
                         isSelected
-                          ? "border-slate-800 bg-slate-50 ring-2 ring-slate-800/10 shadow-sm"
-                          : "border-slate-200 hover:border-slate-300 bg-white"
+                          ? "border-indigo-500 bg-indigo-500/10 shadow-sm"
+                          : "border-slate-800 hover:border-slate-700 bg-slate-950/40"
                       }`}
                     >
                       <span
-                        className="w-5 h-5 rounded-full border border-slate-200 shrink-0"
+                        className="w-5 h-5 rounded-full border border-slate-700 shrink-0"
                         style={{
-                          backgroundColor: th.color,
+                          backgroundColor: theme.color,
                         }}
                       />
 
-                      <span className="flex-1">
-                        <span className="block text-sm font-medium text-slate-700">
-                          {th.name}
-                        </span>
+                      <span className="flex-1 text-xs font-semibold text-slate-200">
+                        {theme.name}
                       </span>
 
                       {isSelected && (
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-800 text-white text-[10px] font-bold">
-                          <Check className="w-3 h-3" />
-                        </span>
+                        <Check className="w-4 h-4 text-indigo-400" />
                       )}
                     </button>
                   );
@@ -1132,20 +1112,18 @@ export default function BuilderPage({
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
-              <div>
-                <h3 className="font-semibold text-slate-800 text-base">
-                  Submission Limits & Deadlines
-                </h3>
-              </div>
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
+              <h3 className="font-bold text-white text-base">
+                Submission Limits & Deadlines
+              </h3>
 
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-sm font-medium text-slate-800">
+                  <h4 className="text-xs font-semibold text-white">
                     Accept Submissions
                   </h4>
 
-                  <p className="text-xs text-slate-400">
+                  <p className="text-[11px] text-slate-400">
                     Master switch to open or close this form.
                   </p>
                 </div>
@@ -1162,16 +1140,20 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
+                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label
+                  htmlFor="max-submissions"
+                  className="block text-xs font-medium text-slate-300 mb-1"
+                >
                   Maximum Submissions
                 </label>
 
                 <input
+                  id="max-submissions"
                   type="number"
                   min="0"
                   placeholder="No limit"
@@ -1195,20 +1177,24 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-600 transition"
+                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
                 />
 
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-slate-500 mt-1">
                   Leave empty to allow unlimited submissions.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label
+                  htmlFor="submission-deadline"
+                  className="block text-xs font-medium text-slate-300 mb-1"
+                >
                   Submission Deadline
                 </label>
 
                 <input
+                  id="submission-deadline"
                   type="datetime-local"
                   value={
                     form.deadline
@@ -1228,29 +1214,27 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-600 transition"
+                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
                 />
-
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Leave empty if the form should remain open indefinitely.
-                </p>
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
-              <div>
-                <h3 className="font-semibold text-slate-800 text-base">
-                  Post-Submission Experience
-                </h3>
-              </div>
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
+              <h3 className="font-bold text-white text-base">
+                Post-Submission Experience
+              </h3>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label
+                  htmlFor="custom-message"
+                  className="block text-xs font-medium text-slate-300 mb-1"
+                >
                   Custom Thank You Message
                 </label>
 
                 <textarea
-                  rows={4}
+                  id="custom-message"
+                  rows={3}
                   placeholder="Thank you for submitting your response!"
                   value={form.customMessage || ""}
                   onChange={(event) => {
@@ -1262,16 +1246,20 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-600 transition resize-none"
+                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label
+                  htmlFor="redirect-url"
+                  className="block text-xs font-medium text-slate-300 mb-1"
+                >
                   Redirect URL (Optional)
                 </label>
 
                 <input
+                  id="redirect-url"
                   type="url"
                   placeholder="https://yourwebsite.com/thank-you"
                   value={form.redirectUrl || ""}
@@ -1284,26 +1272,20 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none focus:border-indigo-600 transition"
+                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
                 />
-
-                <p className="text-[11px] text-slate-400 mt-1">
-                  If set, respondents will automatically be forwarded to this
-                  link after submitting.
-                </p>
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-sm font-medium text-slate-800">
+                  <h4 className="text-xs font-semibold text-white">
                     Collect Email Addresses
                   </h4>
 
-                  <p className="text-xs text-slate-400">
-                    Require respondents to provide their email address before
-                    answering.
+                  <p className="text-[11px] text-slate-400">
+                    Require respondents to provide an email before answering.
                   </p>
                 </div>
 
@@ -1319,24 +1301,18 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
+                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
                 />
               </div>
-            </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
-              <h3 className="font-semibold text-slate-800 text-base border-b border-slate-100 pb-3">
-                Notification Alerts
-              </h3>
-
-              <div className="flex items-center justify-between gap-4">
+              <div className="border-t border-slate-800/80 pt-4 flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-sm font-medium text-slate-800">
-                    Email Alerts
+                  <h4 className="text-xs font-semibold text-white">
+                    Email Submission Alerts
                   </h4>
 
-                  <p className="text-xs text-slate-400">
-                    Receive an email alert each time a response is recorded.
+                  <p className="text-[11px] text-slate-400">
+                    Receive an email each time a response is submitted.
                   </p>
                 </div>
 
@@ -1352,7 +1328,7 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
+                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
                 />
               </div>
             </div>
