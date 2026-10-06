@@ -9,11 +9,7 @@ type RouteContext = {
 };
 
 // Fallback chain in case one model encounters 503 high demand or quota
-const CANDIDATE_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-2.5-pro",
-];
+const CANDIDATE_MODELS = ["gemini-3.8-flash", "gemini-3.1-pro-preview"];
 
 export async function POST(_req: Request, { params }: RouteContext) {
   try {
