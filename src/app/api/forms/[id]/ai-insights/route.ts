@@ -8,6 +8,13 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
+// Fallback chain in case one model encounters 503 high demand or quota
+const CANDIDATE_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-2.5-pro",
+];
+
 export async function POST(_req: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
@@ -51,7 +58,6 @@ export async function POST(_req: Request, { params }: RouteContext) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error("GEMINI_API_KEY is not defined in environment variables.");
       return NextResponse.json(
         { error: "GEMINI_API_KEY is not configured on the server." },
         { status: 500 },
@@ -92,8 +98,8 @@ export async function POST(_req: Request, { params }: RouteContext) {
     });
 
     const prompt = `
-You are an executive data analyst for academic and administrative surveys at Obafemi Awolowo University.
-Analyze the following questionnaire responses for the form titled: "${form.title}".
+You are an executive data analyst for surveys at Obafemi Awolowo University.
+Analyze the following questionnaire responses for the form: "${form.title}".
 
 Questionnaire Description: ${form.description || "N/A"}
 Total Responses: ${form.responses.length}
@@ -108,32 +114,52 @@ Respond ONLY with a valid JSON object matching this exact schema:
   "keyFindings": ["Finding 1", "Finding 2", "Finding 3"],
   "recommendations": ["Recommendation 1", "Recommendation 2"]
 }
-Note for sentiment: Choose one of "Positive", "Neutral", "Negative", or "Mixed".
+For sentiment, pick one: "Positive", "Neutral", "Negative", or "Mixed".
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      },
-    });
+    let responseText = "";
+    let lastError: unknown = null;
 
-    const responseText = response.text?.trim() || "{}";
+    // Try candidate models in sequence if one throws 503 or 404
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+          },
+        });
+
+        if (response.text) {
+          responseText = response.text.trim();
+          break;
+        }
+      } catch (err: unknown) {
+        console.warn(
+          `Model ${model} failed, trying fallback:`,
+          err instanceof Error ? err.message : err,
+        );
+        lastError = err;
+      }
+    }
+
+    if (!responseText) {
+      throw (
+        lastError ||
+        new Error(
+          "All AI models are currently busy. Please retry in a few seconds.",
+        )
+      );
+    }
+
     const insights = JSON.parse(responseText);
-
     return NextResponse.json({ success: true, insights });
   } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to generate AI insights.";
-    console.error("AI Insights backend error:", errorMessage);
-    return NextResponse.json(
-      {
-        error:
-          errorMessage ||
-          "Failed to generate AI insights. Please check your Gemini configuration.",
-      },
-      { status: 500 },
-    );
+    console.error("AI Insights backend error:", error);
+    const msg =
+      (error instanceof Error ? error.message : undefined) ||
+      "Failed to generate AI insights. Please try again shortly.";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
