@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   CheckCircle2,
   AlertCircle,
   UploadCloud,
   Paperclip,
+  ArrowRight,
+  ArrowLeft,
+  LayoutList,
+  Sparkles,
+  School,
+  CornerDownLeft,
 } from "lucide-react";
 import { QuestionField } from "@/components/SortableQuestionCard";
 
@@ -35,43 +41,49 @@ type PublicQuestion = Omit<QuestionField, "type"> & {
   type: QuestionField["type"] | "email";
 };
 
-const THEME_PALETTES: Record<
-  string,
-  {
-    primary: string;
-    hover: string;
-    light: string;
-  }
-> = {
+interface ThemePalette {
+  primary: string;
+  hover: string;
+  light: string;
+  ring: string;
+}
+
+const THEME_PALETTES: Record<string, ThemePalette> = {
   indigo: {
     primary: "#4f46e5",
     hover: "#4338ca",
     light: "#eef2ff",
+    ring: "rgba(79, 70, 229, 0.25)",
   },
   emerald: {
     primary: "#059669",
     hover: "#047857",
     light: "#ecfdf5",
+    ring: "rgba(5, 150, 105, 0.25)",
   },
   violet: {
     primary: "#7c3aed",
     hover: "#6d28d9",
     light: "#f5f3ff",
+    ring: "rgba(124, 58, 237, 0.25)",
   },
   amber: {
     primary: "#d97706",
     hover: "#b45309",
     light: "#fffbeb",
+    ring: "rgba(217, 119, 6, 0.25)",
   },
   rose: {
     primary: "#e11d48",
     hover: "#be123c",
     light: "#fff1f2",
+    ring: "rgba(225, 29, 72, 0.25)",
   },
   slate: {
     primary: "#1e293b",
     hover: "#0f172a",
     light: "#f1f5f9",
+    ring: "rgba(30, 41, 59, 0.25)",
   },
 };
 
@@ -95,6 +107,9 @@ export default function PublicFormPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+  const [viewMode, setViewMode] = useState<"focus" | "classic">("focus");
+  const [activeStep, setActiveStep] = useState(0);
 
   const handleInputChange = (questionId: string, value: AnswerValue) => {
     setAnswers((prev) => {
@@ -189,6 +204,7 @@ export default function PublicFormPage() {
         setLoading(false);
         setErrorMsg("Invalid form link.");
       });
+
       return;
     }
 
@@ -233,7 +249,6 @@ export default function PublicFormPage() {
           }
         } catch (error) {
           console.error("Error parsing form fields:", error);
-
           setQuestions([]);
           setErrorMsg("This form contains invalid question data.");
         }
@@ -259,17 +274,88 @@ export default function PublicFormPage() {
     };
   }, [formId]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const totalSteps = useMemo(() => {
+    return (form?.collectEmail ? 1 : 0) + questions.length;
+  }, [form?.collectEmail, questions.length]);
 
+  const activeTheme =
+    THEME_PALETTES[form?.theme || "indigo"] || THEME_PALETTES.indigo;
+
+  const validateCurrentStep = (stepIndex: number): boolean => {
+    setErrorMsg(null);
+
+    if (form?.collectEmail && stepIndex === 0) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const email = respondentEmail.trim();
+
+      if (!email || !emailRegex.test(email)) {
+        setErrorMsg("Please enter a valid email address to continue.");
+        return false;
+      }
+
+      return true;
+    }
+
+    const questionIndex = form?.collectEmail ? stepIndex - 1 : stepIndex;
+
+    const currentQ = questions[questionIndex];
+
+    if (!currentQ) return true;
+
+    const val = answers[currentQ.id];
+
+    if (currentQ.required) {
+      const empty =
+        val === undefined ||
+        val === null ||
+        (typeof val === "string" && val.trim() === "") ||
+        (Array.isArray(val) && val.length === 0);
+
+      if (empty) {
+        setErrorMsg("Please answer this question to proceed.");
+        return false;
+      }
+    }
+
+    if (
+      currentQ.type === "email" &&
+      typeof val === "string" &&
+      val.trim() !== ""
+    ) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailRegex.test(val.trim())) {
+        setErrorMsg("Please enter a valid email address.");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (!validateCurrentStep(activeStep)) return;
+
+    if (activeStep < totalSteps - 1) {
+      setActiveStep((prev) => prev + 1);
+    }
+  };
+
+  const handlePrevStep = () => {
+    setErrorMsg(null);
+
+    if (activeStep > 0) {
+      setActiveStep((prev) => prev - 1);
+    }
+  };
+
+  const triggerSubmit = async () => {
     if (submitting) return;
 
     setErrorMsg(null);
 
-    // Validate top-level email collection if enabled.
     if (form?.collectEmail) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
       const email = respondentEmail.trim();
 
       if (!email || !emailRegex.test(email)) {
@@ -278,7 +364,6 @@ export default function PublicFormPage() {
       }
     }
 
-    // Validate required questions and email fields.
     for (const q of questions) {
       const val = answers[q.id];
 
@@ -290,7 +375,7 @@ export default function PublicFormPage() {
           (Array.isArray(val) && val.length === 0);
 
         if (empty) {
-          setErrorMsg(`Please answer the required question: "${q.title}"`);
+          setErrorMsg(`Please answer required question: "${q.title}"`);
           return;
         }
       }
@@ -370,22 +455,61 @@ export default function PublicFormPage() {
       setSubmitted(true);
     } catch (err) {
       console.error("Error submitting response:", err);
-
       setErrorMsg("An unexpected error occurred while submitting.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const activeTheme =
-    THEME_PALETTES[form?.theme || "indigo"] || THEME_PALETTES.indigo;
+  useEffect(() => {
+    if (viewMode !== "focus" || submitted || loading || totalSteps === 0) {
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.shiftKey) return;
+
+      const target = e.target as HTMLElement;
+
+      if (target.tagName.toLowerCase() === "textarea") {
+        return;
+      }
+
+      e.preventDefault();
+
+      if (activeStep === totalSteps - 1) {
+        void triggerSubmit();
+      } else {
+        handleNextStep();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    viewMode,
+    activeStep,
+    totalSteps,
+    submitted,
+    loading,
+    answers,
+    respondentEmail,
+  ]);
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="flex flex-col items-center gap-3 text-slate-500">
-          <div className="w-8 h-8 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
-          <p className="text-sm">Loading form...</p>
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10">
+            <Sparkles className="h-7 w-7 animate-pulse text-indigo-400" />
+          </div>
+
+          <p className="text-sm font-medium text-slate-300">
+            Loading questionnaire...
+          </p>
         </div>
       </main>
     );
@@ -393,32 +517,34 @@ export default function PublicFormPage() {
 
   if (errorMsg && !form) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center">
-          <AlertCircle size={42} className="mx-auto text-rose-500 mb-4" />
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
+        <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/80 p-8 text-center shadow-2xl">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400">
+            <AlertCircle className="h-7 w-7" />
+          </div>
 
-          <h1 className="text-xl font-bold text-slate-800">Form Unavailable</h1>
+          <h1 className="mt-5 text-2xl font-bold">Form Unavailable</h1>
 
-          <p className="text-sm text-slate-500 mt-2">{errorMsg}</p>
+          <p className="mt-3 text-sm leading-6 text-slate-400">{errorMsg}</p>
         </div>
       </main>
     );
   }
 
-  if (!form) {
-    return null;
-  }
+  if (!form) return null;
 
   if (!form.published) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center">
-          <AlertCircle size={42} className="mx-auto text-amber-500 mb-4" />
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
+        <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/80 p-8 text-center shadow-2xl">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
+            <AlertCircle className="h-7 w-7" />
+          </div>
 
-          <h1 className="text-xl font-bold text-slate-800">Form Closed</h1>
+          <h1 className="mt-5 text-2xl font-bold">Questionnaire Closed</h1>
 
-          <p className="text-sm text-slate-500 mt-2">
-            This form is no longer accepting responses.
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            This questionnaire is no longer accepting submissions.
           </p>
         </div>
       </main>
@@ -427,28 +553,32 @@ export default function PublicFormPage() {
 
   if (submitted) {
     return (
-      <main
-        className="min-h-screen flex items-center justify-center p-6"
-        style={{
-          backgroundColor: activeTheme.light,
-        }}
-      >
-        <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-sm p-8 text-center">
-          <CheckCircle2
-            size={52}
-            className="mx-auto mb-5"
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
+        <div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900/80 p-8 text-center shadow-2xl backdrop-blur-xl sm:p-10">
+          <div
+            className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl"
             style={{
+              backgroundColor: activeTheme.light,
               color: activeTheme.primary,
             }}
-          />
+          >
+            <CheckCircle2 className="h-10 w-10" />
+          </div>
 
-          <h1 className="text-2xl font-bold text-slate-800">
+          <p
+            className="mt-6 text-xs font-bold uppercase tracking-[0.18em]"
+            style={{ color: activeTheme.primary }}
+          >
+            Submission Confirmed
+          </p>
+
+          <h1 className="mt-2 text-3xl font-bold text-white">
             Response Recorded
           </h1>
 
-          <p className="mt-3 text-sm leading-6 text-slate-600 whitespace-pre-wrap">
+          <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-400">
             {form.customMessage ||
-              `Thank you! Your response to "${form.title}" has been recorded.`}
+              `Thank you! Your response to "${form.title}" has been successfully saved.`}
           </p>
 
           <button
@@ -457,196 +587,511 @@ export default function PublicFormPage() {
               setAnswers({});
               setRespondentEmail("");
               setErrorMsg(null);
+              setActiveStep(0);
               setSubmitted(false);
             }}
-            style={{
-              color: activeTheme.primary,
-            }}
-            className="mt-6 text-xs font-semibold hover:underline cursor-pointer"
+            style={{ color: activeTheme.primary }}
+            className="mt-6 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold hover:underline"
           >
             Submit another response
+            <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </main>
     );
   }
 
+  const isFocusEmailStep = Boolean(form.collectEmail) && activeStep === 0;
+
+  const currentFocusQ = form.collectEmail
+    ? questions[activeStep - 1]
+    : questions[activeStep];
+
+  const progressPercent =
+    totalSteps > 0 ? Math.round(((activeStep + 1) / totalSteps) * 100) : 0;
+
   return (
-    <main
-      className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6"
-      style={{
-        borderTop: `6px solid ${activeTheme.primary}`,
-      }}
-    >
-      <div className="max-w-2xl mx-auto">
-        {/* Header Card */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 mb-5">
-          <div
-            className="h-1.5 w-16 rounded-full mb-5"
-            style={{
-              backgroundColor: activeTheme.primary,
-            }}
-          />
+    <main className="relative min-h-screen overflow-x-hidden bg-slate-950 text-white">
+      {/* Ambient background glow */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-[-15rem] h-[35rem] w-[35rem] -translate-x-1/2 rounded-full bg-indigo-600/10 blur-3xl" />
+        <div className="absolute bottom-[-15rem] left-[-10rem] h-[30rem] w-[30rem] rounded-full bg-purple-600/10 blur-3xl" />
+        <div className="absolute right-[-10rem] top-1/3 h-[30rem] w-[30rem] rounded-full bg-cyan-500/5 blur-3xl" />
+      </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-            {form.title}
-          </h1>
-
-          {form.description && (
-            <p className="mt-3 text-sm leading-6 text-slate-500 whitespace-pre-wrap">
-              {form.description}
-            </p>
-          )}
-
-          <p className="mt-5 text-xs text-slate-400">
-            <span
-              style={{
-                color: activeTheme.primary,
-              }}
+      {/* Top Header Bar */}
+      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
+              style={{ backgroundColor: activeTheme.primary }}
             >
-              *
-            </span>{" "}
-            Indicates required question
-          </p>
+              FC
+            </div>
+
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">
+                {form.title}
+              </p>
+
+              <p className="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500 sm:block">
+                OAU Campus Survey
+              </p>
+            </div>
+          </div>
+
+          {/* Mode Switcher */}
+          <div className="flex shrink-0 items-center rounded-xl border border-slate-800 bg-slate-900/80 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("focus")}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                viewMode === "focus"
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Focus</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("classic")}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                viewMode === "classic"
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Classic</span>
+            </button>
+          </div>
         </div>
 
-        {/* Error Message */}
-        {errorMsg && (
-          <div
-            className="mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm"
-            style={{
-              borderColor: "#fecdd3",
-              backgroundColor: "#fff1f2",
-              color: "#be123c",
-            }}
-            role="alert"
-          >
-            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+        {/* Focus Mode Progress */}
+        {viewMode === "focus" && totalSteps > 0 && (
+          <div className="h-0.5 w-full bg-slate-900">
+            <div
+              className="h-full transition-all duration-500"
+              style={{
+                width: `${progressPercent}%`,
+                backgroundColor: activeTheme.primary,
+              }}
+            />
+          </div>
+        )}
+      </header>
 
+      <div className="relative z-10 mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+        {/* Global Error Banner */}
+        {errorMsg && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-300">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Top-Level Email Collection */}
-          {form.collectEmail && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
-              <div className="flex items-start gap-2">
-                <span
-                  className="text-xs font-semibold shrink-0 mt-1"
-                  style={{
-                    color: activeTheme.primary,
-                  }}
-                >
-                  •
-                </span>
+        {/* FOCUS MODE */}
+        {viewMode === "focus" && (
+          <section>
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Question {Math.min(activeStep + 1, totalSteps)} of{" "}
+                  {totalSteps}
+                </p>
+              </div>
 
-                <div className="flex-1">
-                  <h2 className="text-sm sm:text-base font-medium text-slate-800 leading-6">
-                    Email Address
-                    <span
-                      className="ml-1"
-                      style={{
-                        color: activeTheme.primary,
-                      }}
-                      aria-label="Required"
-                    >
-                      *
-                    </span>
-                  </h2>
+              <span className="text-xs font-medium text-slate-500">
+                {progressPercent}% completed
+              </span>
+            </div>
 
-                  <p className="mt-1 text-xs text-slate-400">
-                    Your email address will be recorded with your submission.
-                  </p>
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
+              {isFocusEmailStep ? (
+                <div>
+                  <div className="mb-6">
+                    <div className="mb-4 flex items-center gap-2">
+                      <span
+                        className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+                        style={{
+                          backgroundColor: activeTheme.light,
+                          color: activeTheme.primary,
+                        }}
+                      >
+                        Step 1
+                      </span>
+
+                      <span className="rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-rose-400">
+                        Required
+                      </span>
+                    </div>
+
+                    <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                      What is your official student email?
+                    </h1>
+
+                    <p className="mt-3 text-sm leading-6 text-slate-400">
+                      Your institutional address will be securely recorded with
+                      your response.
+                    </p>
+                  </div>
 
                   <input
                     type="email"
                     value={respondentEmail}
                     onChange={(e) => setRespondentEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    autoComplete="email"
-                    required
-                    className="mt-4 w-full border-b border-slate-200 bg-transparent pb-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400"
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = activeTheme.primary;
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = "#e2e8f0";
-                    }}
+                    placeholder="name@student.oauife.edu.ng"
+                    autoFocus
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                   />
+                </div>
+              ) : currentFocusQ ? (
+                <div>
+                  <div className="mb-6">
+                    <div className="mb-4 flex items-center gap-2">
+                      <span className="rounded-full bg-slate-800 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                        Question {activeStep + 1}
+                      </span>
+
+                      {currentFocusQ.required ? (
+                        <span className="rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-rose-400">
+                          Required
+                        </span>
+                      ) : (
+                        <span className="rounded-full border border-slate-700 bg-slate-800/50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                          Optional
+                        </span>
+                      )}
+                    </div>
+
+                    <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                      {currentFocusQ.title}
+                    </h1>
+                  </div>
+
+                  {currentFocusQ.type === "short_answer" && (
+                    <input
+                      type="text"
+                      value={
+                        typeof answers[currentFocusQ.id] === "string"
+                          ? (answers[currentFocusQ.id] as string)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handleInputChange(currentFocusQ.id, e.target.value)
+                      }
+                      placeholder="Type your response here..."
+                      autoFocus
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  )}
+
+                  {currentFocusQ.type === "email" && (
+                    <input
+                      type="email"
+                      value={
+                        typeof answers[currentFocusQ.id] === "string"
+                          ? (answers[currentFocusQ.id] as string)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handleInputChange(currentFocusQ.id, e.target.value)
+                      }
+                      placeholder="name@student.oauife.edu.ng"
+                      autoFocus
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  )}
+
+                  {currentFocusQ.type === "multiple_choice" && (
+                    <div className="space-y-3">
+                      {(currentFocusQ.options || []).map((opt, oIdx) => {
+                        const isSelected = answers[currentFocusQ.id] === opt;
+
+                        return (
+                          <button
+                            type="button"
+                            key={`${currentFocusQ.id}-${oIdx}`}
+                            onClick={() =>
+                              handleInputChange(currentFocusQ.id, opt)
+                            }
+                            className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left text-xs font-medium transition sm:text-sm ${
+                              isSelected
+                                ? "border-indigo-500 bg-indigo-600/10 text-white shadow-md"
+                                : "border-slate-800 bg-slate-950/50 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
+                            }`}
+                          >
+                            <span>{opt}</span>
+
+                            {isSelected && (
+                              <CheckCircle2 className="h-5 w-5 shrink-0 text-indigo-400" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {currentFocusQ.type === "checkbox" && (
+                    <div className="space-y-3">
+                      {(currentFocusQ.options || []).map((opt, oIdx) => {
+                        const answer = answers[currentFocusQ.id];
+
+                        const isSelected =
+                          Array.isArray(answer) && answer.includes(opt);
+
+                        return (
+                          <button
+                            type="button"
+                            key={`${currentFocusQ.id}-${oIdx}`}
+                            onClick={() =>
+                              handleCheckboxChange(currentFocusQ.id, opt)
+                            }
+                            className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left text-xs font-medium transition sm:text-sm ${
+                              isSelected
+                                ? "border-indigo-500 bg-indigo-600/10 text-white shadow-md"
+                                : "border-slate-800 bg-slate-950/50 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
+                            }`}
+                          >
+                            <span>{opt}</span>
+
+                            {isSelected && (
+                              <span className="font-bold text-indigo-400">
+                                ✓
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {currentFocusQ.type === "dropdown" && (
+                    <select
+                      value={
+                        typeof answers[currentFocusQ.id] === "string"
+                          ? (answers[currentFocusQ.id] as string)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handleInputChange(currentFocusQ.id, e.target.value)
+                      }
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-200 outline-none transition focus:border-indigo-500"
+                    >
+                      <option value="">Select an option</option>
+
+                      {(currentFocusQ.options || []).map((opt, oIdx) => (
+                        <option key={`${currentFocusQ.id}-${oIdx}`} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {currentFocusQ.type === "date" && (
+                    <input
+                      type="date"
+                      value={
+                        typeof answers[currentFocusQ.id] === "string"
+                          ? (answers[currentFocusQ.id] as string)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handleInputChange(currentFocusQ.id, e.target.value)
+                      }
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-200 outline-none transition focus:border-indigo-500"
+                    />
+                  )}
+
+                  {currentFocusQ.type === "file_upload" && (
+                    <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 p-5">
+                      {answers[currentFocusQ.id] &&
+                      typeof answers[currentFocusQ.id] === "object" &&
+                      !Array.isArray(answers[currentFocusQ.id]) ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Paperclip className="h-5 w-5 shrink-0 text-indigo-400" />
+
+                            <span className="truncate text-sm text-slate-300">
+                              {(answers[currentFocusQ.id] as UploadedFile).name}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleInputChange(currentFocusQ.id, null)
+                            }
+                            className="ml-3 shrink-0 text-xs text-rose-400 hover:underline"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex cursor-pointer flex-col items-center justify-center py-5 text-center">
+                          <UploadCloud className="mb-3 h-8 w-8 text-slate-500" />
+
+                          <span className="text-sm font-semibold text-slate-300">
+                            {uploadingField === currentFocusQ.id
+                              ? "Uploading file..."
+                              : "Select attachment"}
+                          </span>
+
+                          <span className="mt-1 text-xs text-slate-500">
+                            Max file size 10MB
+                          </span>
+
+                          <input
+                            type="file"
+                            disabled={uploadingField === currentFocusQ.id}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+
+                              if (f) {
+                                void handleFileUpload(currentFocusQ.id, f);
+                              }
+
+                              e.currentTarget.value = "";
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="py-12 text-center text-sm text-slate-500">
+                  No questions available.
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handlePrevStep}
+                disabled={activeStep === 0}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Previous
+              </button>
+
+              <div className="hidden items-center gap-2 text-[11px] text-slate-600 sm:flex">
+                <CornerDownLeft className="h-3.5 w-3.5" />
+                Press Enter
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeStep === totalSteps - 1) {
+                    void triggerSubmit();
+                  } else {
+                    handleNextStep();
+                  }
+                }}
+                disabled={submitting || totalSteps === 0}
+                style={{
+                  backgroundColor: activeTheme.primary,
+                }}
+                className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold text-white shadow-lg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {activeStep === totalSteps - 1 ? (
+                  <>
+                    {submitting ? "Submitting..." : "Complete & Submit"}
+                    <CheckCircle2 className="h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* CLASSIC MODE */}
+        {viewMode === "classic" && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void triggerSubmit();
+            }}
+            className="space-y-5"
+          >
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  style={{
+                    backgroundColor: activeTheme.light,
+                    color: activeTheme.primary,
+                  }}
+                >
+                  <School className="h-5 w-5" />
+                </div>
+
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-bold text-white sm:text-3xl">
+                    {form.title}
+                  </h1>
+
+                  {form.description && (
+                    <p className="mt-3 text-sm leading-6 text-slate-400">
+                      {form.description}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Dynamic Form Questions */}
-          {questions.map((q, idx) => {
-            const fileAnswer =
-              answers[q.id] &&
-              typeof answers[q.id] === "object" &&
-              !Array.isArray(answers[q.id])
-                ? (answers[q.id] as UploadedFile)
-                : null;
+            {form.collectEmail && (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+                <label className="block text-sm font-semibold text-white">
+                  Student Email Address <span className="text-rose-400">*</span>
+                </label>
 
-            return (
+                <input
+                  type="email"
+                  value={respondentEmail}
+                  onChange={(e) => setRespondentEmail(e.target.value)}
+                  placeholder="name@student.oauife.edu.ng"
+                  required
+                  className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+            )}
+
+            {questions.map((q, idx) => (
               <div
                 key={q.id}
-                className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6"
+                className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5"
               >
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-3">
                   <span
-                    className="text-xs font-semibold shrink-0 mt-1"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
                     style={{
+                      backgroundColor: activeTheme.light,
                       color: activeTheme.primary,
                     }}
                   >
-                    {idx + 1}.
+                    {idx + 1}
                   </span>
 
-                  <div className="flex-1">
-                    {/* Question Title */}
-                    <h2 className="text-sm sm:text-base font-medium text-slate-800 leading-6">
-                      {q.title}
-
-                      {q.required && (
-                        <span
-                          className="ml-1"
-                          style={{
-                            color: activeTheme.primary,
-                          }}
-                          aria-label="Required"
-                        >
-                          *
-                        </span>
-                      )}
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-sm font-semibold leading-6 text-white">
+                      {q.title}{" "}
+                      {q.required && <span className="text-rose-400">*</span>}
                     </h2>
 
-                    {/* Email Question */}
-                    {q.type === "email" && (
-                      <input
-                        type="email"
-                        value={
-                          typeof answers[q.id] === "string"
-                            ? (answers[q.id] as string)
-                            : ""
-                        }
-                        onChange={(e) =>
-                          handleInputChange(q.id, e.target.value)
-                        }
-                        placeholder="name@example.com"
-                        autoComplete="email"
-                        className="mt-4 w-full border-b border-slate-200 bg-transparent pb-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400"
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor =
-                            activeTheme.primary;
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = "#e2e8f0";
-                        }}
-                      />
-                    )}
-
-                    {/* Short Answer */}
                     {q.type === "short_answer" && (
                       <input
                         type="text"
@@ -659,24 +1104,32 @@ export default function PublicFormPage() {
                           handleInputChange(q.id, e.target.value)
                         }
                         placeholder="Your answer"
-                        className="mt-4 w-full border-b border-slate-200 bg-transparent pb-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400"
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor =
-                            activeTheme.primary;
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = "#e2e8f0";
-                        }}
+                        className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-indigo-500"
                       />
                     )}
 
-                    {/* Multiple Choice */}
+                    {q.type === "email" && (
+                      <input
+                        type="email"
+                        value={
+                          typeof answers[q.id] === "string"
+                            ? (answers[q.id] as string)
+                            : ""
+                        }
+                        onChange={(e) =>
+                          handleInputChange(q.id, e.target.value)
+                        }
+                        placeholder="name@student.oauife.edu.ng"
+                        className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-indigo-500"
+                      />
+                    )}
+
                     {q.type === "multiple_choice" && (
-                      <div className="mt-4 space-y-3">
-                        {(q.options || []).map((opt, optionIndex) => (
+                      <div className="mt-3 space-y-2">
+                        {(q.options || []).map((opt, oIdx) => (
                           <label
-                            key={`${q.id}-${optionIndex}`}
-                            className="flex items-center gap-3 text-sm text-slate-700 cursor-pointer"
+                            key={`${q.id}-${oIdx}`}
+                            className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 text-sm text-slate-300 transition hover:border-slate-700"
                           >
                             <input
                               type="radio"
@@ -689,7 +1142,7 @@ export default function PublicFormPage() {
                               style={{
                                 accentColor: activeTheme.primary,
                               }}
-                              className="h-4 w-4 cursor-pointer"
+                              className="h-4 w-4"
                             />
 
                             <span>{opt}</span>
@@ -698,10 +1151,9 @@ export default function PublicFormPage() {
                       </div>
                     )}
 
-                    {/* Checkboxes */}
                     {q.type === "checkbox" && (
-                      <div className="mt-4 space-y-3">
-                        {(q.options || []).map((opt, optionIndex) => {
+                      <div className="mt-3 space-y-2">
+                        {(q.options || []).map((opt, oIdx) => {
                           const answer = answers[q.id];
 
                           const selected =
@@ -709,18 +1161,17 @@ export default function PublicFormPage() {
 
                           return (
                             <label
-                              key={`${q.id}-${optionIndex}`}
-                              className="flex items-center gap-3 text-sm text-slate-700 cursor-pointer"
+                              key={`${q.id}-${oIdx}`}
+                              className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 text-sm text-slate-300 transition hover:border-slate-700"
                             >
                               <input
                                 type="checkbox"
-                                value={opt}
                                 checked={selected}
                                 onChange={() => handleCheckboxChange(q.id, opt)}
                                 style={{
                                   accentColor: activeTheme.primary,
                                 }}
-                                className="h-4 w-4 cursor-pointer rounded"
+                                className="h-4 w-4 rounded"
                               />
 
                               <span>{opt}</span>
@@ -730,7 +1181,6 @@ export default function PublicFormPage() {
                       </div>
                     )}
 
-                    {/* Dropdown */}
                     {q.type === "dropdown" && (
                       <select
                         value={
@@ -741,26 +1191,18 @@ export default function PublicFormPage() {
                         onChange={(e) =>
                           handleInputChange(q.id, e.target.value)
                         }
-                        className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition"
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor =
-                            activeTheme.primary;
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = "#e2e8f0";
-                        }}
+                        className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
                       >
                         <option value="">Select an option</option>
 
-                        {(q.options || []).map((opt, optionIndex) => (
-                          <option key={`${q.id}-${optionIndex}`} value={opt}>
+                        {(q.options || []).map((opt, oIdx) => (
+                          <option key={`${q.id}-${oIdx}`} value={opt}>
                             {opt}
                           </option>
                         ))}
                       </select>
                     )}
 
-                    {/* Date */}
                     {q.type === "date" && (
                       <input
                         type="date"
@@ -772,91 +1214,58 @@ export default function PublicFormPage() {
                         onChange={(e) =>
                           handleInputChange(q.id, e.target.value)
                         }
-                        className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition"
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor =
-                            activeTheme.primary;
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = "#e2e8f0";
-                        }}
+                        className="mt-3 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
                       />
                     )}
 
-                    {/* File Upload */}
                     {q.type === "file_upload" && (
-                      <div className="mt-4">
-                        {fileAnswer ? (
-                          <div
-                            className="flex items-center gap-3 rounded-xl border p-3"
-                            style={{
-                              borderColor: activeTheme.primary,
-                              backgroundColor: activeTheme.light,
-                            }}
-                          >
-                            <Paperclip
-                              size={18}
-                              style={{
-                                color: activeTheme.primary,
-                              }}
-                              className="shrink-0"
-                            />
+                      <div className="mt-3 rounded-xl border border-dashed border-slate-700 bg-slate-950/50 p-4">
+                        {answers[q.id] &&
+                        typeof answers[q.id] === "object" &&
+                        !Array.isArray(answers[q.id]) ? (
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <Paperclip className="h-4 w-4 shrink-0 text-indigo-400" />
 
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-700 truncate">
-                                {fileAnswer.name}
-                              </p>
-
-                              <p className="text-[11px] text-slate-400 mt-0.5">
-                                {(fileAnswer.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
+                              <span className="truncate text-sm text-slate-300">
+                                {(answers[q.id] as UploadedFile).name}
+                              </span>
                             </div>
 
                             <button
                               type="button"
                               onClick={() => handleInputChange(q.id, null)}
-                              className="text-rose-500 hover:text-rose-700 text-xs font-medium cursor-pointer shrink-0"
+                              className="shrink-0 text-xs text-rose-400 hover:underline"
                             >
                               Remove
                             </button>
                           </div>
                         ) : (
-                          <label
-                            className={`block border-2 border-dashed rounded-xl p-6 text-center transition ${
-                              uploadingField === q.id
-                                ? "cursor-wait opacity-70"
-                                : "cursor-pointer hover:bg-slate-50"
-                            }`}
-                            style={{
-                              borderColor: activeTheme.primary,
-                            }}
-                          >
-                            <UploadCloud
-                              size={28}
-                              className="mx-auto mb-2"
-                              style={{
-                                color: activeTheme.primary,
-                              }}
-                            />
+                          <label className="flex cursor-pointer items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-400">
+                              <UploadCloud className="h-5 w-5" />
+                            </div>
 
-                            <span className="block text-sm font-medium text-slate-700">
-                              {uploadingField === q.id
-                                ? "Uploading file..."
-                                : "Click to select a file"}
-                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-300">
+                                {uploadingField === q.id
+                                  ? "Uploading file..."
+                                  : "Select file to attach"}
+                              </p>
 
-                            <span className="block text-[11px] text-slate-400 mt-1">
-                              Max file size: 10MB
-                            </span>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                Maximum file size: 10MB
+                              </p>
+                            </div>
 
                             <input
                               type="file"
                               disabled={uploadingField === q.id}
                               onChange={(e) => {
-                                const file = e.target.files?.[0];
+                                const f = e.target.files?.[0];
 
-                                if (file) {
-                                  handleFileUpload(q.id, file);
+                                if (f) {
+                                  void handleFileUpload(q.id, f);
                                 }
 
                                 e.currentTarget.value = "";
@@ -870,40 +1279,27 @@ export default function PublicFormPage() {
                   </div>
                 </div>
               </div>
-            );
-          })}
+            ))}
 
-          {/* Submit */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
             <button
               type="submit"
-              disabled={submitting || uploadingField !== null}
+              disabled={submitting}
               style={{
-                backgroundColor:
-                  submitting || uploadingField !== null
-                    ? "#94a3b8"
-                    : activeTheme.primary,
+                backgroundColor: activeTheme.primary,
               }}
-              onMouseEnter={(e) => {
-                if (!submitting && uploadingField === null) {
-                  e.currentTarget.style.backgroundColor = activeTheme.hover;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!submitting && uploadingField === null) {
-                  e.currentTarget.style.backgroundColor = activeTheme.primary;
-                }
-              }}
-              className="w-full rounded-xl px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed cursor-pointer"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shadow-xl transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? "Submitting..." : "Submit Form"}
-            </button>
+              {submitting ? "Submitting response..." : "Submit Questionnaire"}
 
-            <p className="mt-4 text-center text-[11px] text-slate-400">
-              Never submit passwords via FormCraft.
-            </p>
-          </div>
-        </form>
+              {!submitting && <ArrowRight className="h-4 w-4" />}
+            </button>
+          </form>
+        )}
+
+        {/* Footer Branding */}
+        <p className="mt-8 text-center text-[11px] text-slate-600">
+          Powered by FormCraft • Obafemi Awolowo University
+        </p>
       </div>
     </main>
   );
