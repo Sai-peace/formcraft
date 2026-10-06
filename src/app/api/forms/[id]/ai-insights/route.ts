@@ -8,14 +8,6 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-// Fallback chain in case one model encounters 503 high demand or quota
-// Free-tier enabled Flash models (Pro has limit: 0 on free tier)
-const CANDIDATE_MODELS = [
-  "gemini-3.8-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-flash",
-];
-
 export async function POST(_req: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
@@ -99,7 +91,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
     });
 
     const prompt = `
-You are an executive data analyst for surveys at Obafemi Awolowo University.
+You are an executive data analyst for academic surveys at Obafemi Awolowo University.
 Analyze the following questionnaire responses for the form: "${form.title}".
 
 Questionnaire Description: ${form.description || "N/A"}
@@ -115,16 +107,17 @@ Respond ONLY with a valid JSON object matching this exact schema:
   "keyFindings": ["Finding 1", "Finding 2", "Finding 3"],
   "recommendations": ["Recommendation 1", "Recommendation 2"]
 }
-For sentiment, pick one: "Positive", "Neutral", "Negative", or "Mixed".
+For sentiment, pick one of: "Positive", "Neutral", "Negative", or "Mixed".
 `;
 
     let responseText = "";
     let lastError: unknown = null;
 
-    for (const model of CANDIDATE_MODELS) {
+    // Retry up to 3 times with progressive backoff if 503 high demand occurs
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const response = await ai.models.generateContent({
-          model,
+          model: "gemini-3.8-flash",
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -136,32 +129,45 @@ For sentiment, pick one: "Positive", "Neutral", "Negative", or "Mixed".
           break;
         }
       } catch (err: unknown) {
-        console.warn(
-          `Model ${model} request failed:`,
-          err instanceof Error ? err.message : err,
-        );
         lastError = err;
-        // Wait 800ms before falling back to the next flash model
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `Attempt ${attempt} on gemini-3.8-flash failed:`,
+          errorMessage,
+        );
+
+        // If not the final attempt, pause before retrying
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+        }
       }
     }
 
     if (!responseText) {
-      throw (
-        lastError ||
-        new Error(
-          "AI services are currently busy. Please try again in a few moments.",
-        )
-      );
+      let errorMsg =
+        "The AI service is temporarily experiencing high traffic. Please retry in a few seconds.";
+      if (lastError instanceof Error && lastError.message) {
+        try {
+          const parsed = JSON.parse(lastError.message);
+          if (parsed?.error?.message) {
+            errorMsg = parsed.error.message;
+          }
+        } catch {
+          errorMsg = lastError.message;
+        }
+      } else if (lastError !== null) {
+        errorMsg = String(lastError);
+      }
+      return NextResponse.json({ error: errorMsg }, { status: 503 });
     }
 
     const insights = JSON.parse(responseText);
     return NextResponse.json({ success: true, insights });
   } catch (error: unknown) {
     console.error("AI Insights backend error:", error);
-    const msg =
-      (error instanceof Error ? error.message : undefined) ||
-      "Failed to generate AI insights. Please try again shortly.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to generate AI insights. Please retry shortly." },
+      { status: 500 },
+    );
   }
 }
