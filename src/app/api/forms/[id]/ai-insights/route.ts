@@ -11,7 +11,6 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-// Cascading models with independent daily free quotas
 const CANDIDATE_MODELS = [
   "gemini-2.5-flash",
   "gemini-3.5-flash",
@@ -107,7 +106,7 @@ Analyze these academic survey responses for "${form.title}".
 Submissions:
 ${formattedSubmissions.join("\n")}
 
-Respond ONLY with a valid raw JSON object matching:
+Respond ONLY with valid JSON (no surrounding markdown text, no intro, no outro):
 {
   "summary": "2 concise sentences summarizing respondent consensus.",
   "sentiment": "Neutral",
@@ -127,7 +126,7 @@ Choose sentiment: "Positive", "Neutral", "Negative", or "Mixed".
           contents: prompt,
           config: {
             responseMimeType: "application/json",
-            maxOutputTokens: 400,
+            maxOutputTokens: 1000,
             temperature: 0.2,
           },
         });
@@ -140,7 +139,8 @@ Choose sentiment: "Positive", "Neutral", "Negative", or "Mixed".
         const msg = err instanceof Error ? err.message : String(err);
         lastErrorMessage = msg;
         console.warn(
-          `[AI Failover] Model ${model} failed, trying next candidate. Error: ${msg.slice(0, 150)}`,
+          `[AI Failover] Model ${model} failed, trying next candidate:`,
+          msg.slice(0, 150),
         );
       }
     }
@@ -149,18 +149,27 @@ Choose sentiment: "Positive", "Neutral", "Negative", or "Mixed".
       return NextResponse.json(
         {
           error:
-            "All candidate models are temporarily unavailable or quota-limited. Please retry shortly.",
+            "All candidate models are temporarily unavailable. Please retry shortly.",
           details: lastErrorMessage.slice(0, 200),
         },
         { status: 503 },
       );
     }
 
+    // Strip markdown code fences if present
     let cleanJson = responseText;
     if (cleanJson.startsWith("```")) {
       cleanJson = cleanJson
         .replace(/^```(?:json)?\s*/i, "")
-        .replace(/```\s*$/, "");
+        .replace(/```\s*$/, "")
+        .trim();
+    }
+
+    // Isolate the outermost JSON object if any preamble leaked through
+    const firstBrace = cleanJson.indexOf("{");
+    const lastBrace = cleanJson.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
     }
 
     let insights;
