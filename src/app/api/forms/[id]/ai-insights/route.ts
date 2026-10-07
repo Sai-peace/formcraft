@@ -11,6 +11,21 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
+type FormWithCacheAndResponses = {
+  id: string;
+  title: string;
+  fields: string;
+  cachedAiSummary?: string | null;
+  aiSummaryUpdatedAt?: Date | null;
+  user?: {
+    email: string | null;
+  } | null;
+  responses: Array<{
+    answers: string;
+    createdAt: Date;
+  }>;
+};
+
 const CANDIDATE_MODELS = [
   "gemini-2.5-flash",
   "gemini-3.5-flash",
@@ -18,7 +33,7 @@ const CANDIDATE_MODELS = [
   "gemini-3.8-flash",
 ];
 
-export async function POST(_req: Request, { params }: RouteContext) {
+export async function POST(req: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
 
@@ -34,20 +49,34 @@ export async function POST(_req: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const form = await prisma.form.findUnique({
+    // Optional forceRefresh flag from client if user explicitly asks for a re-synthesis
+    let forceRefresh = false;
+    try {
+      const body = await req.json();
+      if (body && typeof body === "object" && body.forceRefresh) {
+        forceRefresh = true;
+      }
+    } catch {
+      forceRefresh = false;
+    }
+
+    const rawForm = await prisma.form.findUnique({
       where: { id },
       include: {
         user: true,
         responses: {
           select: { answers: true, createdAt: true },
-          take: 25,
+          orderBy: { createdAt: "desc" },
+          take: 50,
         },
       },
     });
 
-    if (!form) {
+    if (!rawForm) {
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
+
+    const form = rawForm as unknown as FormWithCacheAndResponses;
 
     if (form.user?.email !== session.user.email) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -58,6 +87,30 @@ export async function POST(_req: Request, { params }: RouteContext) {
         { error: "No responses available to analyze yet." },
         { status: 400 },
       );
+    }
+
+    // 1. Check if cached summary is still valid
+    const latestResponseTime = form.responses[0]?.createdAt
+      ? new Date(form.responses[0].createdAt).getTime()
+      : 0;
+
+    const cacheTime = form.aiSummaryUpdatedAt
+      ? new Date(form.aiSummaryUpdatedAt).getTime()
+      : 0;
+
+    const hasNewResponsesSinceLastAi = latestResponseTime > cacheTime;
+
+    if (!forceRefresh && form.cachedAiSummary && !hasNewResponsesSinceLastAi) {
+      try {
+        const cached = JSON.parse(form.cachedAiSummary);
+        return NextResponse.json({
+          success: true,
+          insights: cached,
+          cached: true,
+        });
+      } catch {
+        // Fall through to re-synthesize if cached JSON is malformed
+      }
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -185,7 +238,20 @@ Choose sentiment: "Positive", "Neutral", "Negative", or "Mixed".
       );
     }
 
-    return NextResponse.json({ success: true, insights });
+    // 2. Persist the generated insights to avoid repeated Gemini hits
+    try {
+      await prisma.form.update({
+        where: { id },
+        data: {
+          cachedAiSummary: JSON.stringify(insights),
+          aiSummaryUpdatedAt: new Date(),
+        } as never,
+      });
+    } catch (saveError) {
+      console.warn("Failed to persist AI cache to database:", saveError);
+    }
+
+    return NextResponse.json({ success: true, insights, cached: false });
   } catch (error: unknown) {
     console.error("AI Insights backend error:", error);
     return NextResponse.json(
