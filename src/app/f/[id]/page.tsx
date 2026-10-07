@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   CheckCircle2,
@@ -13,6 +13,7 @@ import {
   Sparkles,
   School,
   CornerDownLeft,
+  GraduationCap,
 } from "lucide-react";
 import { QuestionField } from "@/components/SortableQuestionCard";
 
@@ -38,7 +39,7 @@ type AnswerValue = string | string[] | UploadedFile | null | undefined;
 type Answers = Record<string, AnswerValue>;
 
 type PublicQuestion = Omit<QuestionField, "type"> & {
-  type: QuestionField["type"] | "email";
+  type: QuestionField["type"] | "email" | "matric_number";
 };
 
 interface ThemePalette {
@@ -100,6 +101,8 @@ const THEME_PALETTES: Record<string, ThemePalette> = {
     glowRgba: "rgba(148, 163, 184, 0.15)",
   },
 };
+
+const OAU_MATRIC_REGEX = /^[A-Z]{3,4}\/\d{4}\/\d{3,4}$/i;
 
 export default function PublicFormPage() {
   const params = useParams();
@@ -320,6 +323,20 @@ export default function PublicFormPage() {
 
     const value = answers[currentQ.id];
 
+    if (currentQ.type === "matric_number") {
+      const matricVal = typeof value === "string" ? value.trim() : "";
+      if (currentQ.required && !matricVal) {
+        setErrorMsg("Please enter your OAU matric number.");
+        return false;
+      }
+      if (matricVal && !OAU_MATRIC_REGEX.test(matricVal)) {
+        setErrorMsg(
+          "Invalid OAU matric number format. Example: EEG/2021/104 or CSC/2020/045",
+        );
+        return false;
+      }
+    }
+
     if (currentQ.required) {
       const empty =
         value === undefined ||
@@ -365,7 +382,7 @@ export default function PublicFormPage() {
     }
   };
 
-  const triggerSubmit = async (): Promise<void> => {
+  const triggerSubmit = useCallback(async (): Promise<void> => {
     if (submitting) return;
 
     setErrorMsg(null);
@@ -392,6 +409,22 @@ export default function PublicFormPage() {
 
         if (empty) {
           setErrorMsg(`Please answer required question: "${question.title}"`);
+          return;
+        }
+      }
+
+      if (question.type === "matric_number") {
+        const matricVal = typeof value === "string" ? value.trim() : "";
+        if (question.required && !matricVal) {
+          setErrorMsg(
+            `Please provide a matric number for "${question.title}".`,
+          );
+          return;
+        }
+        if (matricVal && !OAU_MATRIC_REGEX.test(matricVal)) {
+          setErrorMsg(
+            `Invalid OAU matric number format for "${question.title}". Example: EEG/2021/104`,
+          );
           return;
         }
       }
@@ -481,7 +514,7 @@ export default function PublicFormPage() {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [submitting, form, respondentEmail, questions, answers, formId]);
 
   useEffect(() => {
     if (viewMode !== "focus" || submitted || loading || totalSteps === 0) {
@@ -519,6 +552,8 @@ export default function PublicFormPage() {
     loading,
     answers,
     respondentEmail,
+    handleNextStep,
+    triggerSubmit,
   ]);
 
   if (loading) {
@@ -798,6 +833,35 @@ export default function PublicFormPage() {
                       {currentFocusQ.title}
                     </h2>
                   </div>
+
+                  {currentFocusQ.type === "matric_number" && (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={
+                            typeof answers[currentFocusQ.id] === "string"
+                              ? (answers[currentFocusQ.id] as string)
+                              : ""
+                          }
+                          onChange={(event) =>
+                            handleInputChange(
+                              currentFocusQ.id,
+                              event.target.value.toUpperCase(),
+                            )
+                          }
+                          placeholder="EEG/2021/104"
+                          autoFocus
+                          className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 pl-11 pr-4 py-3.5 text-sm uppercase tracking-wider text-white font-mono outline-none transition placeholder:text-slate-600 focus:border-slate-500"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Format: DEPT/YEAR/NUMBER (e.g., CPE/2020/012 or
+                        CSC/2021/045)
+                      </p>
+                    </div>
+                  )}
 
                   {currentFocusQ.type === "short_answer" && (
                     <input
@@ -1130,6 +1194,34 @@ export default function PublicFormPage() {
                       )}
                     </h2>
                   </div>
+
+                  {question.type === "matric_number" && (
+                    <div className="mt-4 space-y-2">
+                      <div className="relative">
+                        <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input
+                          type="text"
+                          value={
+                            typeof answers[question.id] === "string"
+                              ? (answers[question.id] as string)
+                              : ""
+                          }
+                          onChange={(event) =>
+                            handleInputChange(
+                              question.id,
+                              event.target.value.toUpperCase(),
+                            )
+                          }
+                          placeholder="EEG/2021/104"
+                          className="w-full rounded-xl border border-slate-800 bg-slate-950/80 pl-10 pr-4 py-3 text-sm uppercase tracking-wider text-white font-mono outline-none placeholder:text-slate-600 focus:border-slate-500"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Format: DEPT/YEAR/NUMBER (e.g., CPE/2020/012 or
+                        CSC/2021/045)
+                      </p>
+                    </div>
+                  )}
 
                   {question.type === "short_answer" && (
                     <input

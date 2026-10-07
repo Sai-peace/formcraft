@@ -1,7 +1,8 @@
-"use client";
+("use client");
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import PreviewDrawer from "@/components/PreviewDrawer";
 import {
   ArrowLeft,
   Check,
@@ -17,8 +18,9 @@ import {
   TrendingUp,
   AlertCircle,
   Lightbulb,
-  ExternalLink,
+  Eye,
   GraduationCap,
+  Printer,
 } from "lucide-react";
 import ShareModal from "@/components/ShareModal";
 import {
@@ -130,6 +132,8 @@ export default function BuilderPage({
     }),
   );
 
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   const saveForm = async (
     updatedQuestions: BuilderQuestion[] = questions,
     updatedMeta: FormData | null = form,
@@ -221,7 +225,6 @@ export default function BuilderPage({
         method: "POST",
       });
 
-      // Safely read text first to prevent JSON syntax crash if Vercel sends HTML
       const rawText = await res.text();
       let data: unknown = {};
       try {
@@ -251,6 +254,10 @@ export default function BuilderPage({
     } finally {
       setGeneratingAi(false);
     }
+  };
+
+  const handlePrintReport = () => {
+    window.print();
   };
 
   useEffect(() => {
@@ -520,12 +527,44 @@ export default function BuilderPage({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
-      <div className="fixed inset-0 pointer-events-none z-0">
+      {/* Print Stylesheet Overrides */}
+      <style jsx global>{`
+        @media print {
+          body {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+          }
+          header,
+          .no-print,
+          button {
+            display: none !important;
+          }
+          .print-container {
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+          }
+          .print-card {
+            border: 1px solid #e2e8f0 !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+            break-inside: avoid;
+            margin-bottom: 24px !important;
+          }
+          .print-card * {
+            color: #0f172a !important;
+          }
+        }
+      `}</style>
+
+      <div className="fixed inset-0 pointer-events-none z-0 no-print">
         <div className="absolute -top-32 left-1/3 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[140px]" />
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-25" />
       </div>
 
-      <header className="sticky top-0 z-40 bg-slate-900/70 border-b border-slate-800/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 bg-slate-900/70 border-b border-slate-800/80 backdrop-blur-xl no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -589,15 +628,14 @@ export default function BuilderPage({
                 {form.published ? "Active (Live)" : "Draft Mode"}
               </button>
 
-              <a
-                href={`/f/${formId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-medium transition"
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700/80 transition cursor-pointer"
               >
-                <span>View Form</span>
-                <ExternalLink size={13} />
-              </a>
+                <Eye size={14} />
+                <span>Preview</span>
+              </button>
             </div>
           </div>
 
@@ -644,7 +682,7 @@ export default function BuilderPage({
         </div>
       </header>
 
-      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-6 print-container">
         {activeTab === "builder" && (
           <div className="space-y-5">
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl">
@@ -708,7 +746,7 @@ export default function BuilderPage({
               </SortableContext>
             </DndContext>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 no-print">
               <button
                 type="button"
                 onClick={() => addQuestion("multiple_choice")}
@@ -732,7 +770,7 @@ export default function BuilderPage({
 
         {activeTab === "responses" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl print-card">
               <div>
                 <h3 className="text-base font-bold text-white">
                   {responses.length}{" "}
@@ -744,7 +782,7 @@ export default function BuilderPage({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap no-print">
                 <button
                   type="button"
                   onClick={() => void generateAiInsights()}
@@ -760,6 +798,17 @@ export default function BuilderPage({
                       ? "Synthesizing with Gemini..."
                       : "AI Executive Summary"}
                   </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintReport}
+                  disabled={responses.length === 0}
+                  className="p-2 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Print or Save PDF Report"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Print / PDF</span>
                 </button>
 
                 <button
@@ -789,14 +838,14 @@ export default function BuilderPage({
             </div>
 
             {aiError && (
-              <div className="flex items-start gap-2.5 p-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs">
+              <div className="flex items-start gap-2.5 p-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs no-print">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
                 <span className="leading-relaxed">{aiError}</span>
               </div>
             )}
 
             {aiInsights && (
-              <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+              <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden print-card">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-xl bg-purple-600/30 border border-purple-500/30 text-purple-300 flex items-center justify-center">
@@ -875,11 +924,11 @@ export default function BuilderPage({
             )}
 
             {loadingResponses ? (
-              <div className="py-20 text-center text-slate-500 text-xs">
+              <div className="py-20 text-center text-slate-500 text-xs no-print">
                 Fetching response records...
               </div>
             ) : responses.length === 0 ? (
-              <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-12 text-center">
+              <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-12 text-center no-print">
                 <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
 
                 <h4 className="font-semibold text-white text-sm">
@@ -970,7 +1019,7 @@ export default function BuilderPage({
                     return (
                       <div
                         key={question.id}
-                        className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm"
+                        className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm print-card"
                       >
                         <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
                           <span className="text-sm font-semibold text-white">
@@ -1098,7 +1147,7 @@ export default function BuilderPage({
                   return (
                     <div
                       key={question.id}
-                      className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm"
+                      className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm print-card"
                     >
                       <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
                         <span className="text-xs font-semibold text-white">
@@ -1515,6 +1564,15 @@ export default function BuilderPage({
         onClose={() => setIsShareOpen(false)}
         formId={formId}
         formTitle={form.title}
+      />
+
+      <PreviewDrawer
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        formTitle={form.title}
+        formDescription={form?.description ?? ""}
+        questions={questions}
+        formId={formId}
       />
     </div>
   );
