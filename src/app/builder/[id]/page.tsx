@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import PreviewDrawer from "@/components/PreviewDrawer";
+import { parseOauMatric } from "@/lib/departments";
 import {
   ArrowLeft,
   Check,
@@ -21,6 +22,9 @@ import {
   Eye,
   GraduationCap,
   Printer,
+  Trash2,
+  Copy,
+  Code2,
 } from "lucide-react";
 import ShareModal from "@/components/ShareModal";
 import {
@@ -111,6 +115,9 @@ export default function BuilderPage({
   const router = useRouter();
 
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
+
   const [form, setForm] = useState<FormData | null>(null);
   const [questions, setQuestions] = useState<BuilderQuestion[]>([]);
   const [activeTab, setActiveTab] = useState<
@@ -168,10 +175,7 @@ export default function BuilderPage({
 
       if (res.ok) {
         setSavedSuccess(true);
-
-        window.setTimeout(() => {
-          setSavedSuccess(false);
-        }, 2000);
+        window.setTimeout(() => setSavedSuccess(false), 2000);
       }
     } catch (error) {
       console.error("Failed to save form:", error);
@@ -182,37 +186,63 @@ export default function BuilderPage({
 
   const togglePublishStatus = async () => {
     if (!form) return;
-
-    const updated = {
-      ...form,
-      published: !form.published,
-    };
-
+    const updated = { ...form, published: !form.published };
     setForm(updated);
     await saveForm(questions, updated);
   };
 
   const fetchResponses = async () => {
     setLoadingResponses(true);
-
     try {
       const res = await fetch(`/api/forms/${formId}/responses`, {
         cache: "no-store",
       });
-
       if (!res.ok) {
         setResponses([]);
         return;
       }
-
       const data: unknown = await res.json();
-
       setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
     } catch (error) {
       console.error("Failed to fetch responses:", error);
       setResponses([]);
     } finally {
       setLoadingResponses(false);
+    }
+  };
+
+  const deleteSingleResponse = async (responseId: string) => {
+    if (!confirm("Delete this submission record?")) return;
+    try {
+      const res = await fetch(`/api/forms/${formId}/responses/${responseId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setResponses((prev) => prev.filter((r) => r.id !== responseId));
+      }
+    } catch (err) {
+      console.error("Delete failed:", err);
+    }
+  };
+
+  const clearAllResponses = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to permanently delete ALL recorded responses? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/forms/${formId}/responses`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setResponses([]);
+        setAiInsights(null);
+      }
+    } catch (err) {
+      console.error("Clear all failed:", err);
     }
   };
 
@@ -249,7 +279,6 @@ export default function BuilderPage({
         err instanceof Error
           ? err.message
           : "Failed to communicate with AI synthesizer.";
-
       setAiError(message);
     } finally {
       setGeneratingAi(false);
@@ -262,32 +291,22 @@ export default function BuilderPage({
 
   useEffect(() => {
     let ignore = false;
-
     async function loadForm() {
       try {
-        const res = await fetch(`/api/forms/${formId}`, {
-          cache: "no-store",
-        });
-
+        const res = await fetch(`/api/forms/${formId}`, { cache: "no-store" });
         if (!res.ok) {
           router.push("/");
           return;
         }
-
         const data = (await res.json()) as FormData;
-
         if (ignore) return;
-
         setForm(data);
 
         try {
           const parsed: unknown = JSON.parse(data.fields || "[]");
-
-          if (Array.isArray(parsed)) {
-            setQuestions(parsed as BuilderQuestion[]);
-          } else {
-            setQuestions([]);
-          }
+          setQuestions(
+            Array.isArray(parsed) ? (parsed as BuilderQuestion[]) : [],
+          );
         } catch {
           setQuestions([]);
         }
@@ -297,70 +316,36 @@ export default function BuilderPage({
     }
 
     void loadForm();
-
     return () => {
       ignore = true;
     };
   }, [formId, router]);
 
+  // Live Response Auto-Polling: every 15s when active on the responses tab
   useEffect(() => {
     if (activeTab !== "responses") return;
+    const initialFetch = setTimeout(() => {
+      void fetchResponses();
+    }, 0);
 
-    let ignore = false;
-
-    const loadResponses = async () => {
-      setLoadingResponses(true);
-
-      try {
-        const res = await fetch(`/api/forms/${formId}/responses`, {
-          cache: "no-store",
-        });
-
-        if (!res.ok) {
-          if (!ignore) setResponses([]);
-          return;
-        }
-
-        const data: unknown = await res.json();
-
-        if (!ignore) {
-          setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
-        }
-      } catch (error) {
-        console.error("Failed to load responses:", error);
-
-        if (!ignore) {
-          setResponses([]);
-        }
-      } finally {
-        if (!ignore) {
-          setLoadingResponses(false);
-        }
-      }
-    };
-
-    void loadResponses();
+    const interval = setInterval(() => {
+      void fetchResponses();
+    }, 15000);
 
     return () => {
-      ignore = true;
+      clearTimeout(initialFetch);
+      clearInterval(interval);
     };
   }, [activeTab, formId]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
     if (!over || active.id === over.id) return;
-
-    const oldIndex = questions.findIndex(
-      (question) => question.id === active.id,
-    );
-
-    const newIndex = questions.findIndex((question) => question.id === over.id);
-
+    const oldIndex = questions.findIndex((q) => q.id === active.id);
+    const newIndex = questions.findIndex((q) => q.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
     const reordered = arrayMove(questions, oldIndex, newIndex);
-
     setQuestions(reordered);
     void saveForm(reordered);
   };
@@ -376,18 +361,15 @@ export default function BuilderPage({
         : undefined,
       required: false,
     };
-
     const updated = [...questions, newQuestion];
-
     setQuestions(updated);
     void saveForm(updated);
   };
 
   const updateQuestion = (updatedQuestion: BuilderQuestion) => {
-    const updated = questions.map((question) =>
-      question.id === updatedQuestion.id ? updatedQuestion : question,
+    const updated = questions.map((q) =>
+      q.id === updatedQuestion.id ? updatedQuestion : q,
     );
-
     setQuestions(updated);
     void saveForm(updated);
   };
@@ -399,26 +381,21 @@ export default function BuilderPage({
       title: `${question.title} (Copy)`,
       options: question.options ? [...question.options] : undefined,
     };
-
     const updated = [...questions, copy];
-
     setQuestions(updated);
     void saveForm(updated);
   };
 
   const deleteQuestion = (id: string) => {
-    const updated = questions.filter((question) => question.id !== id);
-
+    const updated = questions.filter((q) => q.id !== id);
     setQuestions(updated);
     void saveForm(updated);
   };
 
   const exportToCSV = () => {
     if (responses.length === 0) return;
-
     const escapeCSV = (value: unknown) => {
       const text = value === null || value === undefined ? "" : String(value);
-
       return `"${text.replace(/"/g, '""')}"`;
     };
 
@@ -430,13 +407,11 @@ export default function BuilderPage({
 
     const rows = responses.map((response) => {
       let answersMap: AnswersMap = {};
-
       try {
-        const parsed: unknown =
+        const parsed =
           typeof response.answers === "string"
             ? JSON.parse(response.answers)
             : response.answers;
-
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           answersMap = parsed as AnswersMap;
         }
@@ -446,15 +421,9 @@ export default function BuilderPage({
 
       const rowAnswers = questions.map((question) => {
         const value = answersMap[question.id];
-
-        if (Array.isArray(value)) {
-          return escapeCSV(value.join(", "));
-        }
-
-        if (value !== null && typeof value === "object") {
+        if (Array.isArray(value)) return escapeCSV(value.join(", "));
+        if (value !== null && typeof value === "object")
           return escapeCSV(JSON.stringify(value));
-        }
-
         return escapeCSV(value ?? "");
       });
 
@@ -466,32 +435,71 @@ export default function BuilderPage({
     });
 
     const csvContent = [headers.join(","), ...rows].join("\n");
-
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-
     link.href = url;
-    link.download = `${(form?.title || "form")
-      .replace(/[^a-z0-9]/gi, "_")
-      .toLowerCase()}_responses.csv`;
-
+    link.download = `${(form?.title || "form").replace(/[^a-z0-9]/gi, "_").toLowerCase()}_responses.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
     URL.revokeObjectURL(url);
   };
+
+  const parsedResponses = useMemo(() => {
+    return responses.map((response) => {
+      try {
+        const parsed =
+          typeof response.answers === "string"
+            ? JSON.parse(response.answers)
+            : response.answers;
+        return {
+          ...response,
+          data:
+            parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? (parsed as AnswersMap)
+              : ({} as AnswersMap),
+        };
+      } catch {
+        return { ...response, data: {} as AnswersMap };
+      }
+    });
+  }, [responses]);
+
+  // Department Breakdown Calculation for Matric Number Fields
+  const departmentBreakdown = useMemo(() => {
+    const matricQuestion = questions.find((q) => q.type === "matric_number");
+    if (!matricQuestion) return null;
+
+    const counts: Record<string, number> = {};
+    let totalMatrics = 0;
+
+    parsedResponses.forEach((r) => {
+      const val = r.data[matricQuestion.id];
+      if (typeof val === "string" && val.trim().length > 0) {
+        const parsed = parseOauMatric(val);
+        const deptName = parsed ? parsed.department : "Unrecognized / Other";
+        counts[deptName] = (counts[deptName] || 0) + 1;
+        totalMatrics++;
+      }
+    });
+
+    if (totalMatrics === 0) return null;
+
+    return Object.entries(counts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percent: Math.round((count / totalMatrics) * 100),
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [questions, parsedResponses]);
 
   if (!form) {
     return (
       <main className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-
           <p className="text-xs uppercase tracking-wider text-slate-400">
             Loading workspace...
           </p>
@@ -500,30 +508,32 @@ export default function BuilderPage({
     );
   }
 
-  const parsedResponses = responses.map((response) => {
-    try {
-      const parsed: unknown =
-        typeof response.answers === "string"
-          ? JSON.parse(response.answers)
-          : response.answers;
-
-      return {
-        ...response,
-        data:
-          parsed && typeof parsed === "object" && !Array.isArray(parsed)
-            ? (parsed as AnswersMap)
-            : ({} as AnswersMap),
-      };
-    } catch {
-      return {
-        ...response,
-        data: {} as AnswersMap,
-      };
-    }
-  });
-
   const responseCount =
     responses.length > 0 ? responses.length : (form._count?.responses ?? 0);
+
+  const googleAppsScriptCode = `function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    
+    // Headers setup if empty
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["Timestamp", "Response ID", "Answers (JSON)"]);
+    }
+    
+    sheet.appendRow([
+      data.submittedAt || new Date().toISOString(),
+      data.responseId || "",
+      JSON.stringify(data.answers || {})
+    ]);
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
 
   return (
     <div className="min-h-screen bg-slate-950 print:bg-white text-slate-100 print:text-slate-950 antialiased selection:bg-indigo-500 selection:text-white">
@@ -549,11 +559,7 @@ export default function BuilderPage({
                 type="text"
                 value={form.title}
                 onChange={(event) => {
-                  const updated = {
-                    ...form,
-                    title: event.target.value,
-                  };
-
+                  const updated = { ...form, title: event.target.value };
                   setForm(updated);
                   void saveForm(questions, updated);
                 }}
@@ -658,11 +664,7 @@ export default function BuilderPage({
                 type="text"
                 value={form.title}
                 onChange={(event) => {
-                  const updated = {
-                    ...form,
-                    title: event.target.value,
-                  };
-
+                  const updated = { ...form, title: event.target.value };
                   setForm(updated);
                   void saveForm(questions, updated);
                 }}
@@ -673,11 +675,7 @@ export default function BuilderPage({
               <textarea
                 value={form.description || ""}
                 onChange={(event) => {
-                  const updated = {
-                    ...form,
-                    description: event.target.value,
-                  };
-
+                  const updated = { ...form, description: event.target.value };
                   setForm(updated);
                   void saveForm(questions, updated);
                 }}
@@ -744,10 +742,12 @@ export default function BuilderPage({
                   {responses.length}{" "}
                   {responses.length === 1 ? "Response" : "Responses"} Recorded
                 </h3>
-
-                <p className="text-xs text-slate-400 print:text-slate-600 mt-0.5">
-                  Live submission feed and synthesis
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse print:hidden" />
+                  <p className="text-xs text-slate-400 print:text-slate-600">
+                    Auto-updating live sync
+                  </p>
+                </div>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap print:hidden">
@@ -760,7 +760,6 @@ export default function BuilderPage({
                   <Bot
                     className={`w-4 h-4 ${generatingAi ? "animate-spin" : ""}`}
                   />
-
                   <span>
                     {generatingAi
                       ? "Synthesizing with Gemini..."
@@ -787,9 +786,7 @@ export default function BuilderPage({
                   className="p-2 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw
-                    className={`w-3.5 h-3.5 ${
-                      loadingResponses ? "animate-spin" : ""
-                    }`}
+                    className={`w-3.5 h-3.5 ${loadingResponses ? "animate-spin" : ""}`}
                   />
                 </button>
 
@@ -802,8 +799,52 @@ export default function BuilderPage({
                   <Download className="w-3.5 h-3.5" />
                   <span>Export CSV</span>
                 </button>
+
+                {responses.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void clearAllResponses()}
+                    className="p-2 border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 rounded-xl text-xs font-medium transition cursor-pointer"
+                    title="Purge all responses"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* OAU Department Breakdown Card */}
+            {departmentBreakdown && departmentBreakdown.length > 0 && (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl print:border-slate-300 print:bg-white print:text-slate-950">
+                <div className="flex items-center gap-2 mb-4 border-b border-slate-800 print:border-slate-200 pb-3">
+                  <GraduationCap className="h-4 w-4 text-indigo-400 print:text-indigo-700" />
+                  <h4 className="text-sm font-semibold text-white print:text-slate-950">
+                    OAU Department Distribution
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {departmentBreakdown.map((dept) => (
+                    <div
+                      key={dept.name}
+                      className="p-3 rounded-2xl bg-slate-950/50 print:bg-slate-50 border border-slate-800/80 print:border-slate-200 flex items-center justify-between"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <p className="text-xs font-medium text-slate-200 print:text-slate-800 truncate">
+                          {dept.name}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          {dept.count} students
+                        </p>
+                      </div>
+                      <span className="font-mono text-xs font-bold text-indigo-400 print:text-indigo-700">
+                        {dept.percent}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {aiError && (
               <div className="flex items-start gap-2.5 p-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs print:hidden">
@@ -824,7 +865,6 @@ export default function BuilderPage({
                       <h4 className="font-bold text-white print:text-slate-950 text-sm">
                         AI Executive Synthesis
                       </h4>
-
                       <p className="text-[11px] text-slate-400 print:text-slate-600">
                         Synthesized across {responses.length} responses with
                         Gemini
@@ -891,18 +931,16 @@ export default function BuilderPage({
               </div>
             )}
 
-            {loadingResponses ? (
+            {loadingResponses && responses.length === 0 ? (
               <div className="py-20 text-center text-slate-500 text-xs print:hidden">
                 Fetching response records...
               </div>
             ) : responses.length === 0 ? (
               <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-12 text-center print:border-slate-300 print:text-slate-950">
                 <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-
                 <h4 className="font-semibold text-white print:text-slate-950 text-sm">
                   Waiting for responses
                 </h4>
-
                 <p className="text-xs text-slate-400 print:text-slate-600 mt-1">
                   Share your public form link with respondents to begin
                   collecting data.
@@ -919,21 +957,16 @@ export default function BuilderPage({
 
                   if (hasOptions) {
                     const counts: Record<string, number> = {};
-
-                    (question.options || []).forEach((option) => {
-                      counts[option] = 0;
-                    });
+                    (question.options || []).forEach(
+                      (opt) => (counts[opt] = 0),
+                    );
 
                     parsedResponses.forEach((response) => {
                       const answer = response.data[question.id];
-
                       if (Array.isArray(answer)) {
                         answer.forEach((value) => {
                           const key = String(value);
-
-                          if (counts[key] !== undefined) {
-                            counts[key]++;
-                          }
+                          if (counts[key] !== undefined) counts[key]++;
                         });
                       } else if (
                         answer !== undefined &&
@@ -945,10 +978,9 @@ export default function BuilderPage({
                     });
 
                     const totalVotes = Object.values(counts).reduce(
-                      (total, count) => total + count,
+                      (a, b) => a + b,
                       0,
                     );
-
                     const paletteColors = [
                       "#6366f1",
                       "#8b5cf6",
@@ -957,23 +989,15 @@ export default function BuilderPage({
                       "#f59e0b",
                       "#06b6d4",
                     ];
-
                     let cumulativeAngle = 0;
 
                     const segments = (question.options || []).map((opt, i) => {
                       const count = counts[opt] || 0;
-
                       const percent =
                         totalVotes > 0 ? (count / totalVotes) * 100 : 0;
-
-                      const dashArray = `${percent * 2.512} ${
-                        251.2 - percent * 2.512
-                      }`;
-
+                      const dashArray = `${percent * 2.512} ${251.2 - percent * 2.512}`;
                       const dashOffset = -cumulativeAngle * 2.512;
-
                       cumulativeAngle += percent;
-
                       return {
                         opt,
                         count,
@@ -993,7 +1017,6 @@ export default function BuilderPage({
                           <span className="text-sm font-semibold text-white print:text-slate-950">
                             {index + 1}. {question.title}
                           </span>
-
                           <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 print:border-slate-300 print:text-indigo-700">
                             {question.type.replace("_", " ")}
                           </span>
@@ -1015,7 +1038,6 @@ export default function BuilderPage({
                                   stroke="currentColor"
                                   fill="transparent"
                                 />
-
                                 {totalVotes > 0 &&
                                   segments.map((seg, sIdx) => (
                                     <circle
@@ -1037,7 +1059,6 @@ export default function BuilderPage({
                                 <span className="text-xl font-extrabold text-white print:text-slate-950 font-mono">
                                   {totalVotes}
                                 </span>
-
                                 <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                                   Votes
                                 </span>
@@ -1055,16 +1076,12 @@ export default function BuilderPage({
                                   <div className="flex items-center gap-2">
                                     <span
                                       className="h-2.5 w-2.5 rounded-full shrink-0"
-                                      style={{
-                                        backgroundColor: seg.color,
-                                      }}
+                                      style={{ backgroundColor: seg.color }}
                                     />
-
                                     <span className="font-medium text-slate-200 print:text-slate-800">
                                       {seg.opt}
                                     </span>
                                   </div>
-
                                   <span className="font-mono font-semibold text-slate-300 print:text-slate-700">
                                     {seg.count} ({seg.percent}%)
                                   </span>
@@ -1087,30 +1104,19 @@ export default function BuilderPage({
                     );
                   }
 
-                  const textAnswers = parsedResponses
-                    .map((response) => response.data[question.id])
+                  // Textual responses with individual deletion
+                  const textRecords = parsedResponses
+                    .map((r) => ({
+                      id: r.id,
+                      val: r.data[question.id],
+                      createdAt: r.createdAt,
+                    }))
                     .filter(
-                      (value) =>
-                        value !== undefined && value !== null && value !== "",
-                    )
-                    .map((value) => {
-                      if (Array.isArray(value)) {
-                        return value.join(", ");
-                      }
-
-                      if (value !== null && typeof value === "object") {
-                        return JSON.stringify(value);
-                      }
-
-                      return String(value);
-                    });
-
-                  const completionRate =
-                    responses.length > 0
-                      ? Math.round(
-                          (textAnswers.length / responses.length) * 100,
-                        )
-                      : 0;
+                      (rec) =>
+                        rec.val !== undefined &&
+                        rec.val !== null &&
+                        rec.val !== "",
+                    );
 
                   return (
                     <div
@@ -1121,20 +1127,18 @@ export default function BuilderPage({
                         <span className="text-xs font-semibold text-white print:text-slate-950">
                           {index + 1}. {question.title}
                         </span>
-
                         <span className="text-[10px] font-mono text-indigo-400 uppercase print:text-indigo-700">
                           {question.type.replace("_", " ")}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="grid grid-cols-2 gap-3 mb-4">
                         <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-2.5 text-center">
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Total Entries
                           </div>
-
                           <div className="text-sm font-bold text-white print:text-slate-950 mt-0.5">
-                            {textAnswers.length}
+                            {textRecords.length}
                           </div>
                         </div>
 
@@ -1142,39 +1146,47 @@ export default function BuilderPage({
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Unique Answers
                           </div>
-
                           <div className="text-sm font-bold text-indigo-400 print:text-indigo-700 mt-0.5">
-                            {new Set(textAnswers).size}
-                          </div>
-                        </div>
-
-                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-2.5 text-center">
-                          <div className="text-[10px] uppercase font-semibold text-slate-500">
-                            Response Rate
-                          </div>
-
-                          <div className="text-sm font-bold text-emerald-400 print:text-emerald-700 mt-0.5">
-                            {completionRate}%
+                            {
+                              new Set(textRecords.map((r) => String(r.val)))
+                                .size
+                            }
                           </div>
                         </div>
                       </div>
 
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {textAnswers.length === 0 ? (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {textRecords.length === 0 ? (
                           <div className="text-xs text-slate-500 italic">
                             No responses recorded for this question.
                           </div>
                         ) : (
-                          textAnswers.map((text, responseIndex) => (
+                          textRecords.map((item, recIdx) => (
                             <div
-                              key={`${question.id}-${responseIndex}`}
+                              key={item.id}
                               className="text-xs text-slate-300 print:text-slate-800 bg-slate-950/50 print:bg-slate-50 border border-slate-800/80 print:border-slate-200 p-3 rounded-xl flex items-center justify-between gap-3"
                             >
-                              <span className="break-words">{text}</span>
-
-                              <span className="text-[10px] text-slate-500 font-mono shrink-0">
-                                #{responseIndex + 1}
+                              <span className="break-words flex-1">
+                                {typeof item.val === "object"
+                                  ? JSON.stringify(item.val)
+                                  : String(item.val)}
                               </span>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  #{recIdx + 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void deleteSingleResponse(item.id)
+                                  }
+                                  className="text-slate-600 hover:text-rose-400 p-1 transition cursor-pointer print:hidden"
+                                  title="Delete response"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                             </div>
                           ))
                         )}
@@ -1194,7 +1206,6 @@ export default function BuilderPage({
                 <h3 className="font-bold text-white text-base">
                   Respondent Color Theme
                 </h3>
-
                 <p className="text-xs text-slate-400 mt-1">
                   Choose the brand accent color used on public respondent views.
                 </p>
@@ -1203,17 +1214,12 @@ export default function BuilderPage({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {THEME_OPTIONS.map((th) => {
                   const isSelected = (form.theme || "indigo") === th.id;
-
                   return (
                     <button
                       key={th.id}
                       type="button"
                       onClick={() => {
-                        const updated = {
-                          ...form,
-                          theme: th.id,
-                        };
-
+                        const updated = { ...form, theme: th.id };
                         setForm(updated);
                         void saveForm(questions, updated);
                       }}
@@ -1225,15 +1231,11 @@ export default function BuilderPage({
                     >
                       <span
                         className="w-5 h-5 rounded-full border border-slate-700 shrink-0"
-                        style={{
-                          backgroundColor: th.color,
-                        }}
+                        style={{ backgroundColor: th.color }}
                       />
-
                       <span className="flex-1 text-xs font-semibold text-slate-200">
                         {th.name}
                       </span>
-
                       {isSelected && (
                         <span className="text-indigo-400 text-xs font-bold">
                           ✓
@@ -1255,21 +1257,15 @@ export default function BuilderPage({
                   <h4 className="text-xs font-semibold text-white">
                     Accept Submissions
                   </h4>
-
                   <p className="text-[11px] text-slate-400">
                     Master switch to open or close this form.
                   </p>
                 </div>
-
                 <input
                   type="checkbox"
                   checked={form.published}
                   onChange={(e) => {
-                    const updated = {
-                      ...form,
-                      published: e.target.checked,
-                    };
-
+                    const updated = { ...form, published: e.target.checked };
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
@@ -1281,34 +1277,22 @@ export default function BuilderPage({
                 <label className="block text-xs font-medium text-slate-300 mb-1">
                   Maximum Submissions
                 </label>
-
                 <input
                   type="number"
                   min="0"
                   placeholder="No limit"
-                  value={
-                    form.maxSubmissions === null ||
-                    form.maxSubmissions === undefined
-                      ? ""
-                      : form.maxSubmissions
-                  }
+                  value={form.maxSubmissions ?? ""}
                   onChange={(e) => {
                     const val =
                       e.target.value === ""
                         ? null
                         : Math.max(0, parseInt(e.target.value, 10) || 0);
-
-                    const updated = {
-                      ...form,
-                      maxSubmissions: val,
-                    };
-
+                    const updated = { ...form, maxSubmissions: val };
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
                   className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
                 />
-
                 <p className="text-[11px] text-slate-500 mt-1">
                   Leave empty to allow unlimited submissions.
                 </p>
@@ -1318,7 +1302,6 @@ export default function BuilderPage({
                 <label className="block text-xs font-medium text-slate-300 mb-1">
                   Submission Deadline
                 </label>
-
                 <input
                   type="datetime-local"
                   value={
@@ -1330,12 +1313,7 @@ export default function BuilderPage({
                     const val = e.target.value
                       ? new Date(e.target.value).toISOString()
                       : null;
-
-                    const updated = {
-                      ...form,
-                      deadline: val,
-                    };
-
+                    const updated = { ...form, deadline: val };
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
@@ -1354,22 +1332,16 @@ export default function BuilderPage({
                   <h4 className="text-xs font-semibold text-white">
                     Require Email Identification
                   </h4>
-
                   <p className="text-[11px] text-slate-400">
                     Require respondents to enter their @student.oauife.edu.ng
                     address.
                   </p>
                 </div>
-
                 <input
                   type="checkbox"
                   checked={form.collectEmail || false}
                   onChange={(e) => {
-                    const updated = {
-                      ...form,
-                      collectEmail: e.target.checked,
-                    };
-
+                    const updated = { ...form, collectEmail: e.target.checked };
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
@@ -1380,15 +1352,13 @@ export default function BuilderPage({
               <div className="border-t border-slate-800/80 pt-4 flex items-center justify-between gap-4">
                 <div>
                   <h4 className="text-xs font-semibold text-white">
-                    Strict: One Response Per Student
+                    Strict: One Response Per Student (Email & Matric)
                   </h4>
-
                   <p className="text-[11px] text-slate-400">
-                    Automatically blocks the same student email from submitting
-                    duplicate answers.
+                    Automatically rejects duplicate submissions sharing the same
+                    student email OR matric number.
                   </p>
                 </div>
-
                 <input
                   type="checkbox"
                   checked={form.limitOnePerStudent || false}
@@ -1398,34 +1368,6 @@ export default function BuilderPage({
                       limitOnePerStudent: e.target.checked,
                       collectEmail: e.target.checked ? true : form.collectEmail,
                     };
-
-                    setForm(updated);
-                    void saveForm(questions, updated);
-                  }}
-                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
-                />
-              </div>
-
-              <div className="border-t border-slate-800/80 pt-4 flex items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-xs font-semibold text-white">
-                    Email Submission Alerts
-                  </h4>
-
-                  <p className="text-[11px] text-slate-400">
-                    Receive an email each time a response is submitted.
-                  </p>
-                </div>
-
-                <input
-                  type="checkbox"
-                  checked={form.notifyEmail || false}
-                  onChange={(e) => {
-                    const updated = {
-                      ...form,
-                      notifyEmail: e.target.checked,
-                    };
-
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
@@ -1435,42 +1377,41 @@ export default function BuilderPage({
             </div>
 
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
-              <div>
-                <h3 className="font-bold text-white text-base">
-                  Live Webhook & Google Sheets Dispatch
-                </h3>
-
-                <p className="text-xs text-slate-400 mt-1">
-                  Stream every submission in real-time to Google Sheets, Make,
-                  or Zapier webhooks.
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-white text-base">
+                    Live Webhook & Google Sheets Dispatch
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Forward submissions instantly to Google Sheets or Make.com
+                    webhooks.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowScriptModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
+                >
+                  <Code2 size={13} />
+                  <span>Google Apps Script</span>
+                </button>
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">
                   Webhook Target URL
                 </label>
-
                 <input
                   type="url"
                   placeholder="https://script.google.com/macros/s/... or https://hook.eu1.make.com/..."
                   value={form.webhookUrl || ""}
                   onChange={(e) => {
-                    const updated = {
-                      ...form,
-                      webhookUrl: e.target.value,
-                    };
-
+                    const updated = { ...form, webhookUrl: e.target.value };
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
                   className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition font-mono"
                 />
-
-                <p className="text-[11px] text-slate-500 mt-1.5">
-                  Payload delivers formatted submission answers and timestamp as
-                  JSON immediately.
-                </p>
               </div>
             </div>
 
@@ -1483,17 +1424,12 @@ export default function BuilderPage({
                 <label className="block text-xs font-medium text-slate-300 mb-1">
                   Custom Thank You Message
                 </label>
-
                 <textarea
                   rows={3}
                   placeholder="Thank you for submitting your response!"
                   value={form.customMessage || ""}
                   onChange={(e) => {
-                    const updated = {
-                      ...form,
-                      customMessage: e.target.value,
-                    };
-
+                    const updated = { ...form, customMessage: e.target.value };
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
@@ -1505,17 +1441,12 @@ export default function BuilderPage({
                 <label className="block text-xs font-medium text-slate-300 mb-1">
                   Redirect URL (Optional)
                 </label>
-
                 <input
                   type="url"
                   placeholder="https://yourwebsite.com/thank-you"
                   value={form.redirectUrl || ""}
                   onChange={(e) => {
-                    const updated = {
-                      ...form,
-                      redirectUrl: e.target.value,
-                    };
-
+                    const updated = { ...form, redirectUrl: e.target.value };
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
@@ -1526,6 +1457,55 @@ export default function BuilderPage({
           </div>
         )}
       </main>
+
+      {/* Google Apps Script Modal */}
+      {showScriptModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Code2 size={16} className="text-indigo-400" />
+                Google Apps Script Webhook
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowScriptModal(false)}
+                className="text-slate-400 hover:text-white text-xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Open your Google Sheet &gt; <strong>Extensions</strong> &gt;{" "}
+              <strong>Apps Script</strong>. Paste this code, click{" "}
+              <strong>Deploy &gt; New deployment &gt; Web app</strong> (Access:
+              Anyone), and paste the Web App URL into the Webhook Target URL
+              input.
+            </p>
+            <pre className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-[11px] font-mono text-indigo-300 overflow-x-auto max-h-56">
+              {googleAppsScriptCode}
+            </pre>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(googleAppsScriptCode);
+                  setCopiedScript(true);
+                  setTimeout(() => setCopiedScript(false), 2000);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                {copiedScript ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedScript ? "Copied!" : "Copy Script"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ShareModal
         isOpen={isShareOpen}
