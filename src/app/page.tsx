@@ -240,7 +240,7 @@ export default function HomePage() {
   const faqs: FaqItem[] = [
     {
       q: "Who is eligible to create and manage forms on FormCraft?",
-      a: "FormCraft is exclusively locked to Obafemi Awolowo University students and researchers. You must sign in with your official @student.oauife.edu.ng generic student email.",
+      a: "FormCraft is exclusively locked to Obafemi Awolowo University students and researchers. You must sign in with your official OAU generic email e.g @student.oauife.edu.ng or @oauife.edu.ng.",
     },
     {
       q: "Do respondents need an OAU account to fill forms?",
@@ -498,7 +498,7 @@ export default function HomePage() {
               </div>
 
               <p className="mt-3 truncate text-sm font-bold text-white">
-                @student.oauife.edu.ng
+                @student.oauife.edu.ng or @oauife.edu.ng
               </p>
 
               <p className="mt-1 text-[11px] text-slate-500">
@@ -1013,7 +1013,8 @@ export default function HomePage() {
 
         <p className="mt-4 text-xs leading-5 text-slate-500">
           Requires official{" "}
-          <span className="text-slate-300">@student.oauife.edu.ng</span> login.
+          <span className="text-slate-300">@student.oauife.edu.ng</span> or{" "}
+          <span className="text-slate-300">@oauife.edu.ng</span> login.
         </p>
 
         <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1201,7 +1202,7 @@ export default function HomePage() {
                 <School className="h-4 w-4 shrink-0 text-emerald-400" />
 
                 <span className="break-all text-[11px] text-slate-300">
-                  @student.oauife.edu.ng
+                  @student.oauife.edu.ng or @oauife.edu.ng
                 </span>
               </div>
             </article>
