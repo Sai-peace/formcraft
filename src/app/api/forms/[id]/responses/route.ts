@@ -2,15 +2,11 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -90,18 +86,13 @@ export async function GET(_req: Request, { params }: RouteContext) {
     }
 
     const responses = await prisma.response.findMany({
-      where: {
-        formId: id,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
+      where: { formId: id },
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(responses);
   } catch (error) {
     console.error("GET responses error:", error);
-
     return NextResponse.json(
       { error: "Failed to fetch responses" },
       { status: 500 },
@@ -141,16 +132,13 @@ export async function POST(req: Request, { params }: RouteContext) {
 
     if (!form.published) {
       return NextResponse.json(
-        {
-          error: "This form is closed and no longer accepting submissions.",
-        },
+        { error: "This form is closed and no longer accepting submissions." },
         { status: 403 },
       );
     }
 
     if (form.deadline) {
       const deadline = new Date(form.deadline);
-
       if (!Number.isNaN(deadline.getTime()) && new Date() > deadline) {
         return NextResponse.json(
           {
@@ -172,15 +160,12 @@ export async function POST(req: Request, { params }: RouteContext) {
       form._count.responses >= maxLimit
     ) {
       return NextResponse.json(
-        {
-          error: "This form has reached its maximum response capacity.",
-        },
+        { error: "This form has reached its maximum response capacity." },
         { status: 403 },
       );
     }
 
     let body: ResponseBody;
-
     try {
       body = (await req.json()) as ResponseBody;
     } catch {
@@ -198,11 +183,9 @@ export async function POST(req: Request, { params }: RouteContext) {
     }
 
     let parsedAnswersObj: AnswersRecord = {};
-
     if (typeof body.answers === "string") {
       try {
         const parsed = JSON.parse(body.answers);
-
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           parsedAnswersObj = parsed as AnswersRecord;
         }
@@ -217,7 +200,7 @@ export async function POST(req: Request, { params }: RouteContext) {
       parsedAnswersObj = body.answers as AnswersRecord;
     }
 
-    // Parse question architecture to detect matric_number questions
+    // Extract matric question ID
     let questions: Array<{ id: string; type: string }> = [];
     try {
       questions = JSON.parse(form.fields || "[]");
@@ -225,92 +208,77 @@ export async function POST(req: Request, { params }: RouteContext) {
       questions = [];
     }
 
-    const matricQuestionIds = questions
-      .filter((q) => q.type === "matric_number")
-      .map((q) => q.id);
+    const matricQuestion = questions.find((q) => q.type === "matric_number");
+    const rawMatric = matricQuestion
+      ? String(parsedAnswersObj[matricQuestion.id] ?? "")
+          .trim()
+          .toUpperCase()
+      : null;
+    const submittedMatric =
+      rawMatric && rawMatric.length > 0 ? rawMatric : null;
 
-    const studentEmail = String(parsedAnswersObj.respondent_email ?? "")
+    const rawEmail = String(parsedAnswersObj.respondent_email ?? "")
       .trim()
       .toLowerCase();
+    const submittedEmail = rawEmail && rawEmail.length > 0 ? rawEmail : null;
 
-    const submittedMatrics = matricQuestionIds
-      .map((qId) => parsedAnswersObj[qId])
-      .filter(
-        (val): val is string =>
-          typeof val === "string" && val.trim().length > 0,
-      )
-      .map((val) => val.trim().toUpperCase());
-
-    // One-submission-per-student check (Email AND Matric)
+    // Fast indexed SQL lookup for duplicate checks
     if (form.limitOnePerStudent) {
-      const existingSubmissions = await prisma.response.findMany({
-        where: {
-          formId: id,
-        },
-        select: {
-          answers: true,
-        },
-      });
+      if (submittedEmail) {
+        const emailExists = await prisma.response.findFirst({
+          where: {
+            formId: id,
+            respondentEmail: submittedEmail,
+          },
+          select: { id: true },
+        });
 
-      for (const submission of existingSubmissions) {
-        let prevAnswers: Record<string, unknown> = {};
-        try {
-          prevAnswers = JSON.parse(submission.answers) as Record<
-            string,
-            unknown
-          >;
-        } catch {
-          prevAnswers = {};
+        if (emailExists) {
+          return NextResponse.json(
+            {
+              error:
+                "Duplicate submission rejected: This email address has already submitted a response.",
+            },
+            { status: 409 },
+          );
         }
+      }
 
-        // Email duplicate check
-        if (studentEmail && prevAnswers.respondent_email) {
-          const prevEmail = String(prevAnswers.respondent_email)
-            .trim()
-            .toLowerCase();
-          if (prevEmail === studentEmail) {
-            return NextResponse.json(
-              {
-                error:
-                  "Duplicate submission rejected: This email address has already submitted a response.",
-              },
-              { status: 409 },
-            );
-          }
-        }
+      if (submittedMatric) {
+        const matricExists = await prisma.response.findFirst({
+          where: {
+            formId: id,
+            respondentMatric: submittedMatric,
+          },
+          select: { id: true },
+        });
 
-        // Matric number duplicate check
-        if (submittedMatrics.length > 0) {
-          for (const qId of matricQuestionIds) {
-            const prevMatric = prevAnswers[qId];
-            if (
-              typeof prevMatric === "string" &&
-              submittedMatrics.includes(prevMatric.trim().toUpperCase())
-            ) {
-              return NextResponse.json(
-                {
-                  error: `Duplicate submission rejected: A response has already been recorded for matric number "${prevMatric}".`,
-                },
-                { status: 409 },
-              );
-            }
-          }
+        if (matricExists) {
+          return NextResponse.json(
+            {
+              error: `Duplicate submission rejected: A response has already been recorded for matric number "${submittedMatric}".`,
+            },
+            { status: 409 },
+          );
         }
       }
     }
 
     const answersString = JSON.stringify(parsedAnswersObj);
 
+    // Save submission with first-class indexed fields
     const newResponse = await prisma.response.create({
       data: {
         formId: id,
         answers: answersString,
+        respondentEmail: submittedEmail,
+        respondentMatric: submittedMatric,
       },
     });
 
-    // Fire webhook to Google Sheets / Make / Zapier
+    // Fire webhook asynchronously (Google Sheets / Make)
     if (form.webhookUrl && /^https?:\/\//i.test(form.webhookUrl)) {
-      fetch(form.webhookUrl, {
+      void fetch(form.webhookUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -327,52 +295,33 @@ export async function POST(req: Request, { params }: RouteContext) {
       });
     }
 
-    // Email alert
-    if (
-      form.notifyEmail &&
-      form.user?.email &&
-      process.env.SMTP_USER &&
-      process.env.SMTP_PASS
-    ) {
-      const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    // High-speed non-blocking transactional email via Resend
+    if (form.notifyEmail && form.user?.email && resend) {
+      const baseUrl =
+        process.env.NEXTAUTH_URL || "https://formcraft.vercel.app";
       const formUrl = `${baseUrl}/builder/${id}`;
 
-      transporter
-        .sendMail({
-          from: `"FormCraft" <${process.env.SMTP_USER}>`,
+      void resend.emails
+        .send({
+          from: "FormCraft <onboarding@resend.dev>",
           to: form.user.email,
-          subject: `New response received for "${form.title}"`,
+          subject: `New submission for "${form.title}"`,
           html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-              <h2>New Submission Recorded</h2>
-              <p>
-                A new response has been submitted for
-                <strong>"${form.title}"</strong>.
-              </p>
-              <p>
-                <a
-                  href="${formUrl}"
-                  style="
-                    display: inline-block;
-                    padding: 10px 16px;
-                    background: #4f46e5;
-                    color: #ffffff;
-                    text-decoration: none;
-                    border-radius: 6px;
-                  "
-                >
-                  View Responses in Dashboard →
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
+              <h2 style="color: #4f46e5;">New Submission Recorded</h2>
+              <p>A new response has been submitted for <strong>"${form.title}"</strong>.</p>
+              ${submittedMatric ? `<p><strong>Matric Number:</strong> ${submittedMatric}</p>` : ""}
+              <p style="margin-top: 20px;">
+                <a href="${formUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-block;">
+                  View Live Feed in Dashboard →
                 </a>
               </p>
-              <p>
-                FormCraft • Obafemi Awolowo University
-              </p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin-top: 24px;" />
+              <p style="font-size: 12px; color: #64748b;">FormCraft • Obafemi Awolowo University</p>
             </div>
           `,
         })
-        .catch((error) => {
-          console.error("Email alert failed:", error);
-        });
+        .catch((err) => console.error("Resend delivery failed:", err));
     }
 
     return NextResponse.json(
@@ -386,7 +335,6 @@ export async function POST(req: Request, { params }: RouteContext) {
     );
   } catch (error) {
     console.error("POST response error:", error);
-
     return NextResponse.json(
       { error: "Failed to save response" },
       { status: 500 },
@@ -394,7 +342,7 @@ export async function POST(req: Request, { params }: RouteContext) {
   }
 }
 
-// DELETE /api/forms/[id]/responses - Wipe/purge all responses for this form
+// DELETE /api/forms/[id]/responses
 export async function DELETE(_req: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
@@ -417,11 +365,7 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
       include: { user: true },
     });
 
-    if (!form) {
-      return NextResponse.json({ error: "Form not found" }, { status: 404 });
-    }
-
-    if (form.user?.email !== session.user.email) {
+    if (!form || form.user?.email !== session.user.email) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -435,7 +379,6 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
     });
   } catch (error) {
     console.error("DELETE all responses error:", error);
-
     return NextResponse.json(
       { error: "Failed to delete responses." },
       { status: 500 },
