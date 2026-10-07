@@ -57,6 +57,9 @@ export async function PUT(
             : JSON.stringify(body.fields),
         published: body.published,
         theme: body.theme || "indigo",
+        collectEmail: Boolean(body.collectEmail),
+        limitOnePerStudent: Boolean(body.limitOnePerStudent),
+        webhookUrl: body.webhookUrl ? String(body.webhookUrl).trim() : null,
         maxSubmissions:
           body.maxSubmissions !== undefined && body.maxSubmissions !== ""
             ? Number(body.maxSubmissions)

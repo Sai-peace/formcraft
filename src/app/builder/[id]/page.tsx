@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Lightbulb,
   ExternalLink,
+  GraduationCap,
 } from "lucide-react";
 import ShareModal from "@/components/ShareModal";
 import {
@@ -27,7 +28,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
+  type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -48,6 +49,12 @@ const THEME_OPTIONS = [
   { id: "slate", name: "Minimal Slate", color: "#1e293b" },
 ];
 
+type BuilderQuestionType = QuestionField["type"] | "matric_number";
+
+type BuilderQuestion = Omit<QuestionField, "type"> & {
+  type: BuilderQuestionType;
+};
+
 interface FormData {
   id: string;
   title: string;
@@ -56,6 +63,8 @@ interface FormData {
   published: boolean;
   theme?: string | null;
   collectEmail?: boolean;
+  limitOnePerStudent?: boolean;
+  webhookUrl?: string | null;
   maxSubmissions?: number | null;
   deadline?: string | null;
   customMessage?: string | null;
@@ -70,10 +79,6 @@ interface RawResponse {
   id: string;
   answers: string;
   createdAt: string;
-}
-
-interface ParsedResponse extends RawResponse {
-  data: AnswersMap;
 }
 
 interface AiInsightsData {
@@ -105,7 +110,7 @@ export default function BuilderPage({
 
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [form, setForm] = useState<FormData | null>(null);
-  const [questions, setQuestions] = useState<QuestionField[]>([]);
+  const [questions, setQuestions] = useState<BuilderQuestion[]>([]);
   const [activeTab, setActiveTab] = useState<
     "builder" | "responses" | "settings"
   >("builder");
@@ -126,7 +131,7 @@ export default function BuilderPage({
   );
 
   const saveForm = async (
-    updatedQuestions: QuestionField[] = questions,
+    updatedQuestions: BuilderQuestion[] = questions,
     updatedMeta: FormData | null = form,
   ) => {
     if (!updatedMeta) return;
@@ -146,6 +151,8 @@ export default function BuilderPage({
           published: updatedMeta.published,
           theme: updatedMeta.theme || "indigo",
           collectEmail: updatedMeta.collectEmail ?? false,
+          limitOnePerStudent: updatedMeta.limitOnePerStudent ?? false,
+          webhookUrl: updatedMeta.webhookUrl ?? null,
           maxSubmissions: updatedMeta.maxSubmissions ?? null,
           deadline: updatedMeta.deadline ?? null,
           customMessage: updatedMeta.customMessage ?? null,
@@ -155,16 +162,13 @@ export default function BuilderPage({
         }),
       });
 
-      if (!res.ok) {
-        console.error("Failed to save form:", await res.text());
-        return;
+      if (res.ok) {
+        setSavedSuccess(true);
+
+        window.setTimeout(() => {
+          setSavedSuccess(false);
+        }, 2000);
       }
-
-      setSavedSuccess(true);
-
-      window.setTimeout(() => {
-        setSavedSuccess(false);
-      }, 2000);
     } catch (error) {
       console.error("Failed to save form:", error);
     } finally {
@@ -175,7 +179,7 @@ export default function BuilderPage({
   const togglePublishStatus = async () => {
     if (!form) return;
 
-    const updated: FormData = {
+    const updated = {
       ...form,
       published: !form.published,
     };
@@ -199,18 +203,7 @@ export default function BuilderPage({
 
       const data: unknown = await res.json();
 
-      setResponses(
-        Array.isArray(data)
-          ? data.filter(
-              (item): item is RawResponse =>
-                typeof item === "object" &&
-                item !== null &&
-                "id" in item &&
-                "answers" in item &&
-                "createdAt" in item,
-            )
-          : [],
-      );
+      setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
     } catch (error) {
       console.error("Failed to fetch responses:", error);
       setResponses([]);
@@ -228,39 +221,29 @@ export default function BuilderPage({
         method: "POST",
       });
 
-      const data: unknown = await res.json();
+      const data: {
+        error?: string;
+        insights?: AiInsightsData;
+      } = await res.json();
 
       if (!res.ok) {
-        const message =
-          typeof data === "object" &&
-          data !== null &&
-          "error" in data &&
-          typeof data.error === "string"
-            ? data.error
-            : "Failed to generate AI insights.";
-
-        setAiError(message);
+        setAiError(data.error || "Failed to generate AI insights.");
         return;
       }
 
-      if (
-        typeof data === "object" &&
-        data !== null &&
-        "insights" in data &&
-        typeof data.insights === "object" &&
-        data.insights !== null
-      ) {
-        const insights = data.insights as AiInsightsData;
-        setAiInsights(insights);
-      } else {
-        setAiError("The AI response was invalid.");
+      if (!data.insights) {
+        setAiError("AI returned no insights.");
+        return;
       }
+
+      setAiInsights(data.insights);
     } catch (error) {
-      setAiError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Failed to communicate with AI synthesizer.",
-      );
+          : "Failed to communicate with AI synthesizer.";
+
+      setAiError(message);
     } finally {
       setGeneratingAi(false);
     }
@@ -269,7 +252,7 @@ export default function BuilderPage({
   useEffect(() => {
     let ignore = false;
 
-    const loadForm = async () => {
+    async function loadForm() {
       try {
         const res = await fetch(`/api/forms/${formId}`, {
           cache: "no-store",
@@ -289,20 +272,18 @@ export default function BuilderPage({
         try {
           const parsed: unknown = JSON.parse(data.fields || "[]");
 
-          setQuestions(
-            Array.isArray(parsed) ? (parsed as QuestionField[]) : [],
-          );
+          if (Array.isArray(parsed)) {
+            setQuestions(parsed as BuilderQuestion[]);
+          } else {
+            setQuestions([]);
+          }
         } catch {
           setQuestions([]);
         }
       } catch (error) {
         console.error("Failed to load form:", error);
-
-        if (!ignore) {
-          router.push("/");
-        }
       }
-    };
+    }
 
     void loadForm();
 
@@ -332,18 +313,7 @@ export default function BuilderPage({
         const data: unknown = await res.json();
 
         if (!ignore) {
-          setResponses(
-            Array.isArray(data)
-              ? data.filter(
-                  (item): item is RawResponse =>
-                    typeof item === "object" &&
-                    item !== null &&
-                    "id" in item &&
-                    "answers" in item &&
-                    "createdAt" in item,
-                )
-              : [],
-          );
+          setResponses(Array.isArray(data) ? (data as RawResponse[]) : []);
         }
       } catch (error) {
         console.error("Failed to load responses:", error);
@@ -384,12 +354,15 @@ export default function BuilderPage({
     void saveForm(reordered);
   };
 
-  const addQuestion = () => {
-    const newQuestion: QuestionField = {
+  const addQuestion = (type: BuilderQuestionType = "multiple_choice") => {
+    const newQuestion: BuilderQuestion = {
       id: `q-${Date.now()}`,
-      title: "Untitled Question",
-      type: "multiple_choice",
-      options: ["Option 1"],
+      title:
+        type === "matric_number" ? "OAU Matric Number" : "Untitled Question",
+      type,
+      options: ["multiple_choice", "checkbox", "dropdown"].includes(type)
+        ? ["Option 1"]
+        : undefined,
       required: false,
     };
 
@@ -399,7 +372,7 @@ export default function BuilderPage({
     void saveForm(updated);
   };
 
-  const updateQuestion = (updatedQuestion: QuestionField) => {
+  const updateQuestion = (updatedQuestion: BuilderQuestion) => {
     const updated = questions.map((question) =>
       question.id === updatedQuestion.id ? updatedQuestion : question,
     );
@@ -408,8 +381,8 @@ export default function BuilderPage({
     void saveForm(updated);
   };
 
-  const duplicateQuestion = (question: QuestionField) => {
-    const copy: QuestionField = {
+  const duplicateQuestion = (question: BuilderQuestion) => {
+    const copy: BuilderQuestion = {
       ...question,
       id: `q-${Date.now()}`,
       title: `${question.title} (Copy)`,
@@ -432,7 +405,7 @@ export default function BuilderPage({
   const exportToCSV = () => {
     if (responses.length === 0) return;
 
-    const escapeCSV = (value: unknown): string => {
+    const escapeCSV = (value: unknown) => {
       const text = value === null || value === undefined ? "" : String(value);
 
       return `"${text.replace(/"/g, '""')}"`;
@@ -504,16 +477,19 @@ export default function BuilderPage({
 
   if (!form) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-xs text-slate-400">Loading workspace...</p>
+      <main className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+
+          <p className="text-xs uppercase tracking-wider text-slate-400">
+            Loading workspace...
+          </p>
         </div>
-      </div>
+      </main>
     );
   }
 
-  const parsedResponses: ParsedResponse[] = responses.map((response) => {
+  const parsedResponses = responses.map((response) => {
     try {
       const parsed: unknown =
         typeof response.answers === "string"
@@ -525,12 +501,12 @@ export default function BuilderPage({
         data:
           parsed && typeof parsed === "object" && !Array.isArray(parsed)
             ? (parsed as AnswersMap)
-            : {},
+            : ({} as AnswersMap),
       };
     } catch {
       return {
         ...response,
-        data: {},
+        data: {} as AnswersMap,
       };
     }
   });
@@ -539,31 +515,30 @@ export default function BuilderPage({
     responses.length > 0 ? responses.length : (form._count?.responses ?? 0);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Background Glow */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-600/10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-0 right-0 w-[400px] h-[300px] bg-purple-600/5 blur-[120px] rounded-full" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute -top-32 left-1/3 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[140px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-25" />
       </div>
 
-      {/* Top Header */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
-              title="Return to Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
+      <header className="sticky top-0 z-40 bg-slate-900/70 border-b border-slate-800/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="h-16 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
+                title="Return to Dashboard"
+              >
+                <ArrowLeft size={18} />
+              </button>
 
-            <div className="min-w-0 flex-1">
               <input
+                type="text"
                 value={form.title}
                 onChange={(event) => {
-                  const updated: FormData = {
+                  const updated = {
                     ...form,
                     title: event.target.value,
                   };
@@ -575,53 +550,54 @@ export default function BuilderPage({
               />
             </div>
 
-            <div className="hidden sm:flex items-center gap-2 text-[11px]">
-              {isSaving ? (
-                <span className="text-slate-500">Saving...</span>
-              ) : savedSuccess ? (
-                <span className="text-emerald-400 flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5" />
-                  Saved
-                </span>
-              ) : (
-                <span className="text-slate-500">All changes saved</span>
-              )}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="hidden sm:inline text-xs text-slate-400">
+                {isSaving ? (
+                  "Saving..."
+                ) : savedSuccess ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-400">
+                    <Check size={13} />
+                    Saved
+                  </span>
+                ) : (
+                  "All changes saved"
+                )}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setIsShareOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-md shadow-indigo-600/20"
+              >
+                <Share2 size={14} />
+                Share
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void togglePublishStatus()}
+                className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition cursor-pointer ${
+                  form.published
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                    : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
+                }`}
+              >
+                {form.published ? "Active (Live)" : "Draft Mode"}
+              </button>
+
+              <a
+                href={`/f/${formId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-medium transition"
+              >
+                <span>View Form</span>
+                <ExternalLink size={13} />
+              </a>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsShareOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-md shadow-indigo-600/20"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Share</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void togglePublishStatus()}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition cursor-pointer ${
-                form.published
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                  : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
-              }`}
-            >
-              {form.published ? "Active (Live)" : "Draft Mode"}
-            </button>
-
-            <a
-              href={`/f/${formId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 transition"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              View Form
-            </a>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-1 mt-3 overflow-x-auto pb-1">
+          <div className="flex items-center gap-1 pb-2 overflow-x-auto">
             <button
               type="button"
               onClick={() => setActiveTab("builder")}
@@ -631,7 +607,7 @@ export default function BuilderPage({
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <Edit3 className="w-3.5 h-3.5" />
+              <Edit3 size={13} />
               Question Architecture
             </button>
 
@@ -644,7 +620,7 @@ export default function BuilderPage({
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <BarChart3 className="w-3.5 h-3.5" />
+              <BarChart3 size={13} />
               Responses ({responseCount})
             </button>
 
@@ -657,23 +633,22 @@ export default function BuilderPage({
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <Sliders className="w-3.5 h-3.5" />
+              <Sliders size={13} />
               Rules & Settings
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* BUILDER TAB */}
+      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-6">
         {activeTab === "builder" && (
           <div className="space-y-5">
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 sm:p-7 backdrop-blur-xl">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl">
               <input
+                type="text"
                 value={form.title}
                 onChange={(event) => {
-                  const updated: FormData = {
+                  const updated = {
                     ...form,
                     title: event.target.value,
                   };
@@ -688,7 +663,7 @@ export default function BuilderPage({
               <textarea
                 value={form.description || ""}
                 onChange={(event) => {
-                  const updated: FormData = {
+                  const updated = {
                     ...form,
                     description: event.target.value,
                   };
@@ -715,28 +690,42 @@ export default function BuilderPage({
                   {questions.map((question) => (
                     <SortableQuestionCard
                       key={question.id}
-                      question={question}
-                      onUpdate={updateQuestion}
+                      question={question as QuestionField}
+                      onUpdate={
+                        updateQuestion as (question: QuestionField) => void
+                      }
                       onDelete={deleteQuestion}
-                      onDuplicate={duplicateQuestion}
+                      onDuplicate={
+                        duplicateQuestion as (question: QuestionField) => void
+                      }
                     />
                   ))}
                 </div>
               </SortableContext>
             </DndContext>
 
-            <button
-              type="button"
-              onClick={addQuestion}
-              className="w-full py-4 border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-indigo-400" />
-              Add Question Card
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => addQuestion("multiple_choice")}
+                className="py-4 border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-indigo-400" />
+                Add Question Card
+              </button>
+
+              <button
+                type="button"
+                onClick={() => addQuestion("matric_number")}
+                className="py-4 border border-indigo-500/30 hover:border-indigo-500 bg-indigo-950/20 hover:bg-indigo-950/40 rounded-2xl text-indigo-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <GraduationCap className="w-4 h-4 text-indigo-400" />
+                Add OAU Matric Number Field
+              </button>
+            </div>
           </div>
         )}
 
-        {/* RESPONSES TAB */}
         {activeTab === "responses" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl">
@@ -754,7 +743,7 @@ export default function BuilderPage({
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={generateAiInsights}
+                  onClick={() => void generateAiInsights()}
                   disabled={generatingAi || responses.length === 0}
                   className="bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-lg shadow-purple-600/20 cursor-pointer disabled:cursor-not-allowed"
                 >
@@ -804,7 +793,7 @@ export default function BuilderPage({
 
             {aiInsights && (
               <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-xl bg-purple-600/30 border border-purple-500/30 text-purple-300 flex items-center justify-center">
                       <BrainCircuit className="h-5 w-5" />
@@ -828,9 +817,7 @@ export default function BuilderPage({
                         ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                         : aiInsights.sentiment === "Negative"
                           ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                          : aiInsights.sentiment === "Mixed"
-                            ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                            : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                     }`}
                   >
                     {aiInsights.sentiment} Sentiment
@@ -849,9 +836,9 @@ export default function BuilderPage({
                     </div>
 
                     <ul className="space-y-2">
-                      {aiInsights.keyFindings.map((finding, index) => (
+                      {aiInsights.keyFindings.map((finding, fIdx) => (
                         <li
-                          key={`${finding}-${index}`}
+                          key={fIdx}
                           className="text-xs text-slate-400 flex items-start gap-2"
                         >
                           <span className="h-1.5 w-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
@@ -868,17 +855,15 @@ export default function BuilderPage({
                     </div>
 
                     <ul className="space-y-2">
-                      {aiInsights.recommendations.map(
-                        (recommendation, index) => (
-                          <li
-                            key={`${recommendation}-${index}`}
-                            className="text-xs text-slate-400 flex items-start gap-2"
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                            <span>{recommendation}</span>
-                          </li>
-                        ),
-                      )}
+                      {aiInsights.recommendations.map((rec, rIdx) => (
+                        <li
+                          key={rIdx}
+                          className="text-xs text-slate-400 flex items-start gap-2"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                          <span>{rec}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </div>
@@ -939,7 +924,7 @@ export default function BuilderPage({
                     });
 
                     const totalVotes = Object.values(counts).reduce(
-                      (sum, count) => sum + count,
+                      (total, count) => total + count,
                       0,
                     );
 
@@ -960,9 +945,9 @@ export default function BuilderPage({
                       const percent =
                         totalVotes > 0 ? (count / totalVotes) * 100 : 0;
 
-                      const dashLength = percent * 2.512;
-
-                      const dashArray = `${dashLength} ${251.2 - dashLength}`;
+                      const dashArray = `${percent * 2.512} ${
+                        251.2 - percent * 2.512
+                      }`;
 
                       const dashOffset = -cumulativeAngle * 2.512;
 
@@ -983,12 +968,12 @@ export default function BuilderPage({
                         key={question.id}
                         className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm"
                       >
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5 gap-3">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
                           <span className="text-sm font-semibold text-white">
                             {index + 1}. {question.title}
                           </span>
 
-                          <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 whitespace-nowrap">
+                          <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
                             {question.type.replace("_", " ")}
                           </span>
                         </div>
@@ -1011,9 +996,9 @@ export default function BuilderPage({
                                 />
 
                                 {totalVotes > 0 &&
-                                  segments.map((seg) => (
+                                  segments.map((seg, sIdx) => (
                                     <circle
-                                      key={seg.opt}
+                                      key={sIdx}
                                       cx="50"
                                       cy="50"
                                       r="40"
@@ -1045,8 +1030,8 @@ export default function BuilderPage({
                                 key={seg.opt}
                                 className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80"
                               >
-                                <div className="flex items-center justify-between text-xs mb-1.5 gap-3">
-                                  <div className="flex items-center gap-2 min-w-0">
+                                <div className="flex items-center justify-between text-xs mb-1.5">
+                                  <div className="flex items-center gap-2">
                                     <span
                                       className="h-2.5 w-2.5 rounded-full shrink-0"
                                       style={{
@@ -1054,12 +1039,12 @@ export default function BuilderPage({
                                       }}
                                     />
 
-                                    <span className="font-medium text-slate-200 truncate">
+                                    <span className="font-medium text-slate-200">
                                       {seg.opt}
                                     </span>
                                   </div>
 
-                                  <span className="font-mono font-semibold text-slate-300 shrink-0">
+                                  <span className="font-mono font-semibold text-slate-300">
                                     {seg.count} ({seg.percent}%)
                                   </span>
                                 </div>
@@ -1087,13 +1072,17 @@ export default function BuilderPage({
                       (value) =>
                         value !== undefined && value !== null && value !== "",
                     )
-                    .map((value) =>
-                      Array.isArray(value)
-                        ? value.join(", ")
-                        : typeof value === "object"
-                          ? JSON.stringify(value)
-                          : String(value),
-                    );
+                    .map((value) => {
+                      if (Array.isArray(value)) {
+                        return value.join(", ");
+                      }
+
+                      if (value !== null && typeof value === "object") {
+                        return JSON.stringify(value);
+                      }
+
+                      return String(value);
+                    });
 
                   const completionRate =
                     responses.length > 0
@@ -1107,17 +1096,17 @@ export default function BuilderPage({
                       key={question.id}
                       className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm"
                     >
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4 gap-3">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
                         <span className="text-xs font-semibold text-white">
                           {index + 1}. {question.title}
                         </span>
 
-                        <span className="text-[10px] font-mono text-indigo-400 uppercase whitespace-nowrap">
+                        <span className="text-[10px] font-mono text-indigo-400 uppercase">
                           {question.type.replace("_", " ")}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                      <div className="grid grid-cols-3 gap-3 mb-4">
                         <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 text-center">
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Total Entries
@@ -1177,10 +1166,8 @@ export default function BuilderPage({
           </div>
         )}
 
-        {/* SETTINGS TAB */}
         {activeTab === "settings" && (
           <div className="space-y-6">
-            {/* Visual Theme */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <div>
                 <h3 className="font-bold text-white text-base">
@@ -1193,17 +1180,17 @@ export default function BuilderPage({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {THEME_OPTIONS.map((theme) => {
-                  const isSelected = (form.theme || "indigo") === theme.id;
+                {THEME_OPTIONS.map((th) => {
+                  const isSelected = (form.theme || "indigo") === th.id;
 
                   return (
                     <button
-                      key={theme.id}
+                      key={th.id}
                       type="button"
                       onClick={() => {
-                        const updated: FormData = {
+                        const updated = {
                           ...form,
-                          theme: theme.id,
+                          theme: th.id,
                         };
 
                         setForm(updated);
@@ -1218,16 +1205,18 @@ export default function BuilderPage({
                       <span
                         className="w-5 h-5 rounded-full border border-slate-700 shrink-0"
                         style={{
-                          backgroundColor: theme.color,
+                          backgroundColor: th.color,
                         }}
                       />
 
                       <span className="flex-1 text-xs font-semibold text-slate-200">
-                        {theme.name}
+                        {th.name}
                       </span>
 
                       {isSelected && (
-                        <Check className="w-4 h-4 text-indigo-400" />
+                        <span className="text-indigo-400 text-xs font-bold">
+                          ✓
+                        </span>
                       )}
                     </button>
                   );
@@ -1235,7 +1224,6 @@ export default function BuilderPage({
               </div>
             </div>
 
-            {/* Submission Limits & Deadlines */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
               <h3 className="font-bold text-white text-base">
                 Submission Limits & Deadlines
@@ -1255,10 +1243,10 @@ export default function BuilderPage({
                 <input
                   type="checkbox"
                   checked={form.published}
-                  onChange={(event) => {
-                    const updated: FormData = {
+                  onChange={(e) => {
+                    const updated = {
                       ...form,
-                      published: event.target.checked,
+                      published: e.target.checked,
                     };
 
                     setForm(updated);
@@ -1269,15 +1257,11 @@ export default function BuilderPage({
               </div>
 
               <div>
-                <label
-                  htmlFor="max-submissions"
-                  className="block text-xs font-medium text-slate-300 mb-1"
-                >
+                <label className="block text-xs font-medium text-slate-300 mb-1">
                   Maximum Submissions
                 </label>
 
                 <input
-                  id="max-submissions"
                   type="number"
                   min="0"
                   placeholder="No limit"
@@ -1287,13 +1271,13 @@ export default function BuilderPage({
                       ? ""
                       : form.maxSubmissions
                   }
-                  onChange={(event) => {
+                  onChange={(e) => {
                     const val =
-                      event.target.value === ""
+                      e.target.value === ""
                         ? null
-                        : Math.max(0, parseInt(event.target.value, 10) || 0);
+                        : Math.max(0, parseInt(e.target.value, 10) || 0);
 
-                    const updated: FormData = {
+                    const updated = {
                       ...form,
                       maxSubmissions: val,
                     };
@@ -1310,27 +1294,23 @@ export default function BuilderPage({
               </div>
 
               <div>
-                <label
-                  htmlFor="submission-deadline"
-                  className="block text-xs font-medium text-slate-300 mb-1"
-                >
+                <label className="block text-xs font-medium text-slate-300 mb-1">
                   Submission Deadline
                 </label>
 
                 <input
-                  id="submission-deadline"
                   type="datetime-local"
                   value={
                     form.deadline
                       ? new Date(form.deadline).toISOString().slice(0, 16)
                       : ""
                   }
-                  onChange={(event) => {
-                    const val = event.target.value
-                      ? new Date(event.target.value).toISOString()
+                  onChange={(e) => {
+                    const val = e.target.value
+                      ? new Date(e.target.value).toISOString()
                       : null;
 
-                    const updated: FormData = {
+                    const updated = {
                       ...form,
                       deadline: val,
                     };
@@ -1343,85 +1323,59 @@ export default function BuilderPage({
               </div>
             </div>
 
-            {/* Post-Submission Experience */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <h3 className="font-bold text-white text-base">
-                Post-Submission Experience
+                Campus Security & Anti-Duplicate
               </h3>
 
-              <div>
-                <label
-                  htmlFor="custom-message"
-                  className="block text-xs font-medium text-slate-300 mb-1"
-                >
-                  Custom Thank You Message
-                </label>
-
-                <textarea
-                  id="custom-message"
-                  rows={3}
-                  placeholder="Thank you for submitting your response!"
-                  value={form.customMessage || ""}
-                  onChange={(event) => {
-                    const updated: FormData = {
-                      ...form,
-                      customMessage: event.target.value,
-                    };
-
-                    setForm(updated);
-                    void saveForm(questions, updated);
-                  }}
-                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition resize-none"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="redirect-url"
-                  className="block text-xs font-medium text-slate-300 mb-1"
-                >
-                  Redirect URL (Optional)
-                </label>
-
-                <input
-                  id="redirect-url"
-                  type="url"
-                  placeholder="https://yourwebsite.com/thank-you"
-                  value={form.redirectUrl || ""}
-                  onChange={(event) => {
-                    const updated: FormData = {
-                      ...form,
-                      redirectUrl: event.target.value,
-                    };
-
-                    setForm(updated);
-                    void saveForm(questions, updated);
-                  }}
-                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
-                />
-              </div>
-            </div>
-
-            {/* Collect Email & Alerts */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h4 className="text-xs font-semibold text-white">
-                    Collect Email Addresses
+                    Require Email Identification
                   </h4>
 
                   <p className="text-[11px] text-slate-400">
-                    Require respondents to provide an email before answering.
+                    Require respondents to enter their @student.oauife.edu.ng
+                    address.
                   </p>
                 </div>
 
                 <input
                   type="checkbox"
                   checked={form.collectEmail || false}
-                  onChange={(event) => {
-                    const updated: FormData = {
+                  onChange={(e) => {
+                    const updated = {
                       ...form,
-                      collectEmail: event.target.checked,
+                      collectEmail: e.target.checked,
+                    };
+
+                    setForm(updated);
+                    void saveForm(questions, updated);
+                  }}
+                  className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
+                />
+              </div>
+
+              <div className="border-t border-slate-800/80 pt-4 flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-xs font-semibold text-white">
+                    Strict: One Response Per Student
+                  </h4>
+
+                  <p className="text-[11px] text-slate-400">
+                    Automatically blocks the same student email from submitting
+                    duplicate answers.
+                  </p>
+                </div>
+
+                <input
+                  type="checkbox"
+                  checked={form.limitOnePerStudent || false}
+                  onChange={(e) => {
+                    const updated = {
+                      ...form,
+                      limitOnePerStudent: e.target.checked,
+                      collectEmail: e.target.checked ? true : form.collectEmail,
                     };
 
                     setForm(updated);
@@ -1445,16 +1399,106 @@ export default function BuilderPage({
                 <input
                   type="checkbox"
                   checked={form.notifyEmail || false}
-                  onChange={(event) => {
-                    const updated: FormData = {
+                  onChange={(e) => {
+                    const updated = {
                       ...form,
-                      notifyEmail: event.target.checked,
+                      notifyEmail: e.target.checked,
                     };
 
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
                   className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+              <div>
+                <h3 className="font-bold text-white text-base">
+                  Live Webhook & Google Sheets Dispatch
+                </h3>
+
+                <p className="text-xs text-slate-400 mt-1">
+                  Stream every submission in real-time to Google Sheets, Make,
+                  or Zapier webhooks.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  Webhook Target URL
+                </label>
+
+                <input
+                  type="url"
+                  placeholder="https://script.google.com/macros/s/... or https://hook.eu1.make.com/..."
+                  value={form.webhookUrl || ""}
+                  onChange={(e) => {
+                    const updated = {
+                      ...form,
+                      webhookUrl: e.target.value,
+                    };
+
+                    setForm(updated);
+                    void saveForm(questions, updated);
+                  }}
+                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition font-mono"
+                />
+
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  Payload delivers formatted submission answers and timestamp as
+                  JSON immediately.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
+              <h3 className="font-bold text-white text-base">
+                Post-Submission Experience
+              </h3>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Custom Thank You Message
+                </label>
+
+                <textarea
+                  rows={3}
+                  placeholder="Thank you for submitting your response!"
+                  value={form.customMessage || ""}
+                  onChange={(e) => {
+                    const updated = {
+                      ...form,
+                      customMessage: e.target.value,
+                    };
+
+                    setForm(updated);
+                    void saveForm(questions, updated);
+                  }}
+                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Redirect URL (Optional)
+                </label>
+
+                <input
+                  type="url"
+                  placeholder="https://yourwebsite.com/thank-you"
+                  value={form.redirectUrl || ""}
+                  onChange={(e) => {
+                    const updated = {
+                      ...form,
+                      redirectUrl: e.target.value,
+                    };
+
+                    setForm(updated);
+                    void saveForm(questions, updated);
+                  }}
+                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
                 />
               </div>
             </div>

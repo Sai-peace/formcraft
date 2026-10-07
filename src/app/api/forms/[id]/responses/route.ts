@@ -23,6 +23,9 @@ type FormWithSettings = {
   deadline: Date | string | null;
   maxSubmissions: number | null;
   notifyEmail: boolean;
+  collectEmail: boolean;
+  limitOnePerStudent: boolean;
+  webhookUrl: string | null;
   redirectUrl: string | null;
   customMessage: string | null;
   user?: {
@@ -33,13 +36,19 @@ type FormWithSettings = {
   };
 };
 
-type ResponseBody = {
-  answers?: unknown;
-};
+type AnswerValue =
+  | string
+  | string[]
+  | number
+  | boolean
+  | Record<string, unknown>
+  | null;
 
-function getFormSettings(form: unknown): FormWithSettings {
-  return form as FormWithSettings;
-}
+type AnswersRecord = Record<string, AnswerValue>;
+
+type ResponseBody = {
+  answers?: AnswersRecord | string;
+};
 
 // GET /api/forms/[id]/responses
 export async function GET(_req: Request, { params }: RouteContext) {
@@ -60,9 +69,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
     }
 
     const form = await prisma.form.findUnique({
-      where: {
-        id,
-      },
+      where: { id },
       select: {
         id: true,
         user: {
@@ -95,9 +102,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
     console.error("GET responses error:", error);
 
     return NextResponse.json(
-      {
-        error: "Failed to fetch responses",
-      },
+      { error: "Failed to fetch responses" },
       { status: 500 },
     );
   }
@@ -116,9 +121,7 @@ export async function POST(req: Request, { params }: RouteContext) {
     }
 
     const rawForm = await prisma.form.findUnique({
-      where: {
-        id,
-      },
+      where: { id },
       include: {
         user: true,
         _count: {
@@ -133,7 +136,7 @@ export async function POST(req: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    const form = getFormSettings(rawForm);
+    const form = rawForm as unknown as FormWithSettings;
 
     if (!form.published) {
       return NextResponse.json(
@@ -159,19 +162,20 @@ export async function POST(req: Request, { params }: RouteContext) {
     }
 
     const maxLimit =
-      form.maxSubmissions !== null && form.maxSubmissions !== undefined
-        ? Number(form.maxSubmissions)
-        : null;
+      form.maxSubmissions !== null ? Number(form.maxSubmissions) : null;
 
-    if (maxLimit !== null && !Number.isNaN(maxLimit) && maxLimit > 0) {
-      if (form._count.responses >= maxLimit) {
-        return NextResponse.json(
-          {
-            error: "This form has reached its maximum response capacity.",
-          },
-          { status: 403 },
-        );
-      }
+    if (
+      maxLimit !== null &&
+      !Number.isNaN(maxLimit) &&
+      maxLimit > 0 &&
+      form._count.responses >= maxLimit
+    ) {
+      return NextResponse.json(
+        {
+          error: "This form has reached its maximum response capacity.",
+        },
+        { status: 403 },
+      );
     }
 
     let body: ResponseBody;
@@ -180,102 +184,159 @@ export async function POST(req: Request, { params }: RouteContext) {
       body = (await req.json()) as ResponseBody;
     } catch {
       return NextResponse.json(
-        {
-          error: "Invalid JSON request body.",
-        },
+        { error: "Invalid JSON request body." },
         { status: 400 },
       );
     }
 
     if (!body || typeof body !== "object") {
       return NextResponse.json(
-        {
-          error: "Invalid request body.",
-        },
+        { error: "Invalid request body." },
         { status: 400 },
       );
     }
 
-    if (
-      body.answers !== undefined &&
-      body.answers !== null &&
-      typeof body.answers !== "string" &&
-      typeof body.answers !== "object"
+    let parsedAnswersObj: AnswersRecord = {};
+
+    if (typeof body.answers === "string") {
+      try {
+        const parsed = JSON.parse(body.answers);
+
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          parsedAnswersObj = parsed as AnswersRecord;
+        }
+      } catch {
+        parsedAnswersObj = {};
+      }
+    } else if (
+      body.answers &&
+      typeof body.answers === "object" &&
+      !Array.isArray(body.answers)
     ) {
-      return NextResponse.json(
-        {
-          error: "Invalid answers format.",
-        },
-        { status: 400 },
-      );
+      parsedAnswersObj = body.answers as AnswersRecord;
     }
 
-    const answers =
-      typeof body.answers === "string"
-        ? body.answers
-        : JSON.stringify(body.answers ?? {});
+    // One-submission-per-student check
+    const studentEmail = String(parsedAnswersObj.respondent_email ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (form.limitOnePerStudent && studentEmail) {
+      const existingSubmissions = await prisma.response.findMany({
+        where: {
+          formId: id,
+        },
+        select: {
+          answers: true,
+        },
+      });
+
+      const alreadySubmitted = existingSubmissions.some((submission) => {
+        try {
+          const parsed = JSON.parse(submission.answers) as Record<
+            string,
+            unknown
+          >;
+
+          return (
+            String(parsed.respondent_email ?? "")
+              .trim()
+              .toLowerCase() === studentEmail
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      if (alreadySubmitted) {
+        return NextResponse.json(
+          {
+            error:
+              "Duplicate submission rejected: This OAU account has already submitted a response to this questionnaire.",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    const answersString = JSON.stringify(parsedAnswersObj);
 
     const newResponse = await prisma.response.create({
       data: {
         formId: id,
-        answers,
+        answers: answersString,
       },
     });
 
-    // Send email notification to form owner via Nodemailer.
-    // Email failures do not prevent the response from being saved.
+    // Fire webhook to Google Sheets / Make / Zapier
+    if (form.webhookUrl && /^https?:\/\//i.test(form.webhookUrl)) {
+      fetch(form.webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          formId: id,
+          formTitle: form.title,
+          responseId: newResponse.id,
+          submittedAt: newResponse.createdAt,
+          answers: parsedAnswersObj,
+        }),
+      }).catch((error) => {
+        console.error("Webhook dispatch failed:", error);
+      });
+    }
+
+    // Email alert
     if (
       form.notifyEmail &&
       form.user?.email &&
       process.env.SMTP_USER &&
       process.env.SMTP_PASS
     ) {
-      try {
-        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+      const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
-        const formUrl = `${baseUrl}/builder/${id}`;
+      const formUrl = `${baseUrl}/builder/${id}`;
 
-        await transporter.sendMail({
+      transporter
+        .sendMail({
           from: `"FormCraft" <${process.env.SMTP_USER}>`,
           to: form.user.email,
           subject: `New response received for "${form.title}"`,
           html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #0f172a; margin-bottom: 16px;">
-                New Submission Recorded
-              </h2>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+              <h2>New Submission Recorded</h2>
 
               <p>
-                Someone just submitted an answer to your form
+                A new response has been submitted for
                 <strong>"${form.title}"</strong>.
               </p>
 
-              <div style="margin: 24px 0;">
+              <p>
                 <a
                   href="${formUrl}"
                   style="
                     display: inline-block;
-                    padding: 12px 18px;
-                    background-color: #4f46e5;
+                    padding: 10px 16px;
+                    background: #4f46e5;
                     color: #ffffff;
                     text-decoration: none;
-                    border-radius: 8px;
-                    font-weight: 600;
+                    border-radius: 6px;
                   "
                 >
                   View Responses in Dashboard →
                 </a>
-              </div>
+              </p>
 
-              <p style="font-size: 13px; color: #64748b;">
+              <p>
                 FormCraft • Obafemi Awolowo University
               </p>
             </div>
           `,
+        })
+        .catch((error) => {
+          console.error("Email alert failed:", error);
         });
-      } catch (mailErr) {
-        console.error("Failed to send email alert:", mailErr);
-      }
     }
 
     return NextResponse.json(
@@ -291,9 +352,7 @@ export async function POST(req: Request, { params }: RouteContext) {
     console.error("POST response error:", error);
 
     return NextResponse.json(
-      {
-        error: "Failed to save response",
-      },
+      { error: "Failed to save response" },
       { status: 500 },
     );
   }
