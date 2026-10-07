@@ -4,6 +4,17 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GoogleGenAI } from "@google/genai";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
+
+// Cascading models with independent daily free quotas
+const CANDIDATE_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-3.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-3.8-flash",
+];
+
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -49,6 +60,7 @@ The user wants you to generate a structured form based on this request: "${promp
 Available question types to use:
 - "short_answer"
 - "email"
+- "matric_number"
 - "multiple_choice"
 - "checkbox"
 - "dropdown"
@@ -72,7 +84,7 @@ Return ONLY a valid JSON object matching this exact schema:
 }
 
 Guidelines:
-- Choose appropriate input types (e.g. use multiple_choice or checkbox for ratings/opinions, short_answer for suggestions, email for contact info).
+- Choose appropriate input types (e.g. use multiple_choice or checkbox for ratings/opinions, matric_number when student identification is needed, short_answer for suggestions, email for contact info).
 - Only include "options" array for "multiple_choice", "checkbox", or "dropdown". For other types, set options to null or omit it.
 - Ensure unique IDs like "q-1", "q-2", etc.
 - Generate between 4 to 8 high-impact questions matching the prompt.
@@ -80,16 +92,17 @@ Guidelines:
 `;
 
     let responseText = "";
-    let lastError: { message?: string } | null = null;
+    let lastErrorMessage = "";
 
-    // Retry loop with progressive backoff for 503 traffic spikes
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    // Iterate through candidate models for instant failover
+    for (const model of CANDIDATE_MODELS) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
+          model,
           contents: systemPrompt,
           config: {
             responseMimeType: "application/json",
+            temperature: 0.2,
           },
         });
 
@@ -98,31 +111,31 @@ Guidelines:
           break;
         }
       } catch (err: unknown) {
-        lastError = err instanceof Error ? err : { message: String(err) };
-        const errorMessage =
-          err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? err.message : String(err);
+        lastErrorMessage = msg;
         console.warn(
-          `Attempt ${attempt} on gemini-3.8-flash failed:`,
-          errorMessage,
+          `[AI Form Gen] ${model} unavailable or quota hit: ${msg.slice(0, 150)}`,
         );
-        if (attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
-        }
       }
     }
 
     if (!responseText) {
-      let errorMsg =
-        "AI service is busy right now. Please retry in a few moments.";
-      if (lastError?.message) {
-        try {
-          const parsed = JSON.parse(lastError.message);
-          if (parsed?.error?.message) errorMsg = parsed.error.message;
-        } catch {
-          errorMsg = lastError.message;
-        }
-      }
-      return NextResponse.json({ error: errorMsg }, { status: 503 });
+      return NextResponse.json(
+        {
+          error:
+            "AI service is busy right now across available models. Please retry in a few moments.",
+          details: lastErrorMessage.slice(0, 200),
+        },
+        { status: 503 },
+      );
+    }
+
+    // Strip markdown code fences if wrapped
+    let cleanJson = responseText;
+    if (cleanJson.startsWith("```")) {
+      cleanJson = cleanJson
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/```\s*$/, "");
     }
 
     let parsedOutput: {
@@ -133,7 +146,7 @@ Guidelines:
     } = {};
 
     try {
-      parsedOutput = JSON.parse(responseText);
+      parsedOutput = JSON.parse(cleanJson);
     } catch (parseErr) {
       console.error("Failed to parse Gemini output:", responseText);
       return NextResponse.json(
@@ -149,7 +162,7 @@ Guidelines:
       ? parsedOutput.questions
       : [];
 
-    // Ensure valid question objects with timestamped IDs
+    // Sanitize question items with unique timestamp IDs
     const sanitizedQuestions = rawQuestions.map((question, idx) => {
       const q =
         typeof question === "object" && question !== null
@@ -157,7 +170,9 @@ Guidelines:
           : {};
       const type = typeof q.type === "string" ? q.type : "short_answer";
       const options = Array.isArray(q.options)
-        ? q.options.filter((option): option is string => typeof option === "string")
+        ? q.options.filter(
+            (option): option is string => typeof option === "string",
+          )
         : [];
 
       return {
