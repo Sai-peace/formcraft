@@ -4,13 +4,20 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GoogleGenAI } from "@google/genai";
 
-// Ensure Next.js doesn't cache and runs with max allowed serverless duration
 export const dynamic = "force-dynamic";
-export const maxDuration = 30; // Max allowed for Vercel functions
+export const maxDuration = 30;
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
+
+// Cascading models with independent daily free quotas
+const CANDIDATE_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-3.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-3.8-flash",
+];
 
 export async function POST(_req: Request, { params }: RouteContext) {
   try {
@@ -34,7 +41,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
         user: true,
         responses: {
           select: { answers: true, createdAt: true },
-          take: 25, // Compact sample for fast processing and low token load
+          take: 25,
         },
       },
     });
@@ -100,7 +107,7 @@ Analyze these academic survey responses for "${form.title}".
 Submissions:
 ${formattedSubmissions.join("\n")}
 
-Respond ONLY with valid JSON (NO markdown backticks, NO explanation):
+Respond ONLY with a valid raw JSON object matching:
 {
   "summary": "2 concise sentences summarizing respondent consensus.",
   "sentiment": "Neutral",
@@ -111,13 +118,12 @@ Choose sentiment: "Positive", "Neutral", "Negative", or "Mixed".
 `;
 
     let responseText = "";
-    let lastError: unknown = null;
+    let lastErrorMessage = "";
 
-    // Strict 2-attempt loop on gemini-3.8-flash with tight token limits
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (const model of CANDIDATE_MODELS) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
+          model,
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -131,31 +137,23 @@ Choose sentiment: "Positive", "Neutral", "Negative", or "Mixed".
           break;
         }
       } catch (err: unknown) {
-        lastError = err;
+        const msg = err instanceof Error ? err.message : String(err);
+        lastErrorMessage = msg;
         console.warn(
-          `Attempt ${attempt} on gemini-3.8-flash failed:`,
-          err instanceof Error ? err.message : err,
+          `[AI Failover] Model ${model} failed, trying next candidate. Error: ${msg.slice(0, 150)}`,
         );
-        if (attempt < 2) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
       }
     }
 
     if (!responseText) {
-      let errorMsg =
-        "The AI service is experiencing a brief traffic spike. Please tap retry in a moment.";
-      if (lastError instanceof Error && lastError.message) {
-        try {
-          const parsed = JSON.parse(lastError.message);
-          if (parsed?.error?.message) {
-            errorMsg = parsed.error.message;
-          }
-        } catch {
-          // Keep user-friendly error message if parsing fails
-        }
-      }
-      return NextResponse.json({ error: errorMsg }, { status: 503 });
+      return NextResponse.json(
+        {
+          error:
+            "All candidate models are temporarily unavailable or quota-limited. Please retry shortly.",
+          details: lastErrorMessage.slice(0, 200),
+        },
+        { status: 503 },
+      );
     }
 
     let cleanJson = responseText;
@@ -170,7 +168,10 @@ Choose sentiment: "Positive", "Neutral", "Negative", or "Mixed".
       insights = JSON.parse(cleanJson);
     } catch {
       return NextResponse.json(
-        { error: "AI response formatting error. Please try again." },
+        {
+          error:
+            "AI output could not be formatted into JSON. Please try again.",
+        },
         { status: 500 },
       );
     }
@@ -179,7 +180,7 @@ Choose sentiment: "Positive", "Neutral", "Negative", or "Mixed".
   } catch (error: unknown) {
     console.error("AI Insights backend error:", error);
     return NextResponse.json(
-      { error: "Failed to generate summary. Please try again shortly." },
+      { error: "Internal error analyzing responses. Please try again." },
       { status: 500 },
     );
   }
