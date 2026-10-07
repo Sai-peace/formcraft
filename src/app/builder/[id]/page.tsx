@@ -1,4 +1,4 @@
-("use client");
+"use client";
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
@@ -526,45 +526,13 @@ export default function BuilderPage({
     responses.length > 0 ? responses.length : (form._count?.responses ?? 0);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
-      {/* Print Stylesheet Overrides */}
-      <style jsx global>{`
-        @media print {
-          body {
-            background-color: #ffffff !important;
-            color: #000000 !important;
-          }
-          header,
-          .no-print,
-          button {
-            display: none !important;
-          }
-          .print-container {
-            max-width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            background: transparent !important;
-          }
-          .print-card {
-            border: 1px solid #e2e8f0 !important;
-            background: #ffffff !important;
-            color: #0f172a !important;
-            box-shadow: none !important;
-            break-inside: avoid;
-            margin-bottom: 24px !important;
-          }
-          .print-card * {
-            color: #0f172a !important;
-          }
-        }
-      `}</style>
-
-      <div className="fixed inset-0 pointer-events-none z-0 no-print">
+    <div className="min-h-screen bg-slate-950 print:bg-white text-slate-100 print:text-slate-950 antialiased selection:bg-indigo-500 selection:text-white">
+      <div className="fixed inset-0 pointer-events-none z-0 print:hidden">
         <div className="absolute -top-32 left-1/3 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[140px]" />
         <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-25" />
       </div>
 
-      <header className="sticky top-0 z-40 bg-slate-900/70 border-b border-slate-800/80 backdrop-blur-xl no-print">
+      <header className="sticky top-0 z-40 bg-slate-900/70 border-b border-slate-800/80 backdrop-blur-xl print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -682,7 +650,7 @@ export default function BuilderPage({
         </div>
       </header>
 
-      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-6 print-container">
+      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-6 print:max-w-full print:p-0">
         {activeTab === "builder" && (
           <div className="space-y-5">
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl">
@@ -746,7 +714,7 @@ export default function BuilderPage({
               </SortableContext>
             </DndContext>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 no-print">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 print:hidden">
               <button
                 type="button"
                 onClick={() => addQuestion("multiple_choice")}
@@ -770,19 +738,19 @@ export default function BuilderPage({
 
         {activeTab === "responses" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl print-card">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl print:border-slate-300 print:bg-white print:text-slate-950">
               <div>
-                <h3 className="text-base font-bold text-white">
+                <h3 className="text-base font-bold text-white print:text-slate-950">
                   {responses.length}{" "}
                   {responses.length === 1 ? "Response" : "Responses"} Recorded
                 </h3>
 
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-400 print:text-slate-600 mt-0.5">
                   Live submission feed and synthesis
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap no-print">
+              <div className="flex items-center gap-2 flex-wrap print:hidden">
                 <button
                   type="button"
                   onClick={() => void generateAiInsights()}
@@ -838,26 +806,26 @@ export default function BuilderPage({
             </div>
 
             {aiError && (
-              <div className="flex items-start gap-2.5 p-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs no-print">
+              <div className="flex items-start gap-2.5 p-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs print:hidden">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
                 <span className="leading-relaxed">{aiError}</span>
               </div>
             )}
 
             {aiInsights && (
-              <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden print-card">
+              <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden print:border-slate-300 print:bg-white print:text-slate-950 print:shadow-none">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-purple-600/30 border border-purple-500/30 text-purple-300 flex items-center justify-center">
+                    <div className="h-9 w-9 rounded-xl bg-purple-600/30 border border-purple-500/30 text-purple-300 flex items-center justify-center print:border-slate-300 print:text-purple-700">
                       <BrainCircuit className="h-5 w-5" />
                     </div>
 
                     <div>
-                      <h4 className="font-bold text-white text-sm">
+                      <h4 className="font-bold text-white print:text-slate-950 text-sm">
                         AI Executive Synthesis
                       </h4>
 
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-[11px] text-slate-400 print:text-slate-600">
                         Synthesized across {responses.length} responses with
                         Gemini
                       </p>
@@ -867,24 +835,24 @@ export default function BuilderPage({
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-semibold border ${
                       aiInsights.sentiment === "Positive"
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 print:text-emerald-700"
                         : aiInsights.sentiment === "Negative"
-                          ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          ? "bg-rose-500/10 text-rose-400 border-rose-500/20 print:text-rose-700"
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/20 print:text-amber-700"
                     }`}
                   >
                     {aiInsights.sentiment} Sentiment
                   </span>
                 </div>
 
-                <p className="text-xs leading-relaxed text-slate-200 mb-5 bg-slate-950/60 border border-slate-800 rounded-2xl p-4">
+                <p className="text-xs leading-relaxed text-slate-200 print:text-slate-800 mb-5 bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-2xl p-4">
                   {aiInsights.summary}
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 mb-2.5">
-                      <TrendingUp className="h-3.5 w-3.5 text-purple-400" />
+                  <div className="bg-slate-950/50 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 print:text-purple-700 mb-2.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-purple-400 print:text-purple-700" />
                       <span>Consensus & Trends</span>
                     </div>
 
@@ -892,18 +860,18 @@ export default function BuilderPage({
                       {aiInsights.keyFindings.map((finding, fIdx) => (
                         <li
                           key={fIdx}
-                          className="text-xs text-slate-400 flex items-start gap-2"
+                          className="text-xs text-slate-400 print:text-slate-700 flex items-start gap-2"
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-400 print:bg-purple-700 mt-1.5 shrink-0" />
                           <span>{finding}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300 mb-2.5">
-                      <Lightbulb className="h-3.5 w-3.5 text-indigo-400" />
+                  <div className="bg-slate-950/50 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300 print:text-indigo-700 mb-2.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-indigo-400 print:text-indigo-700" />
                       <span>Actionable Next Steps</span>
                     </div>
 
@@ -911,9 +879,9 @@ export default function BuilderPage({
                       {aiInsights.recommendations.map((rec, rIdx) => (
                         <li
                           key={rIdx}
-                          className="text-xs text-slate-400 flex items-start gap-2"
+                          className="text-xs text-slate-400 print:text-slate-700 flex items-start gap-2"
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 print:bg-indigo-700 mt-1.5 shrink-0" />
                           <span>{rec}</span>
                         </li>
                       ))}
@@ -924,18 +892,18 @@ export default function BuilderPage({
             )}
 
             {loadingResponses ? (
-              <div className="py-20 text-center text-slate-500 text-xs no-print">
+              <div className="py-20 text-center text-slate-500 text-xs print:hidden">
                 Fetching response records...
               </div>
             ) : responses.length === 0 ? (
-              <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-12 text-center no-print">
+              <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-12 text-center print:border-slate-300 print:text-slate-950">
                 <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
 
-                <h4 className="font-semibold text-white text-sm">
+                <h4 className="font-semibold text-white print:text-slate-950 text-sm">
                   Waiting for responses
                 </h4>
 
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-400 print:text-slate-600 mt-1">
                   Share your public form link with respondents to begin
                   collecting data.
                 </p>
@@ -1019,14 +987,14 @@ export default function BuilderPage({
                     return (
                       <div
                         key={question.id}
-                        className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm print-card"
+                        className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm print:border-slate-300 print:bg-white print:break-inside-avoid"
                       >
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
-                          <span className="text-sm font-semibold text-white">
+                        <div className="flex items-center justify-between border-b border-slate-800 print:border-slate-200 pb-3 mb-5">
+                          <span className="text-sm font-semibold text-white print:text-slate-950">
                             {index + 1}. {question.title}
                           </span>
 
-                          <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
+                          <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 print:border-slate-300 print:text-indigo-700">
                             {question.type.replace("_", " ")}
                           </span>
                         </div>
@@ -1042,7 +1010,7 @@ export default function BuilderPage({
                                   cx="50"
                                   cy="50"
                                   r="40"
-                                  className="text-slate-800"
+                                  className="text-slate-800 print:text-slate-200"
                                   strokeWidth="12"
                                   stroke="currentColor"
                                   fill="transparent"
@@ -1066,7 +1034,7 @@ export default function BuilderPage({
                               </svg>
 
                               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                <span className="text-xl font-extrabold text-white font-mono">
+                                <span className="text-xl font-extrabold text-white print:text-slate-950 font-mono">
                                   {totalVotes}
                                 </span>
 
@@ -1081,7 +1049,7 @@ export default function BuilderPage({
                             {segments.map((seg) => (
                               <div
                                 key={seg.opt}
-                                className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80"
+                                className="p-3 rounded-2xl bg-slate-950/60 print:bg-slate-50 border border-slate-800/80 print:border-slate-200"
                               >
                                 <div className="flex items-center justify-between text-xs mb-1.5">
                                   <div className="flex items-center gap-2">
@@ -1092,17 +1060,17 @@ export default function BuilderPage({
                                       }}
                                     />
 
-                                    <span className="font-medium text-slate-200">
+                                    <span className="font-medium text-slate-200 print:text-slate-800">
                                       {seg.opt}
                                     </span>
                                   </div>
 
-                                  <span className="font-mono font-semibold text-slate-300">
+                                  <span className="font-mono font-semibold text-slate-300 print:text-slate-700">
                                     {seg.count} ({seg.percent}%)
                                   </span>
                                 </div>
 
-                                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="w-full h-2 bg-slate-800 print:bg-slate-200 rounded-full overflow-hidden">
                                   <div
                                     className="h-full rounded-full transition-all duration-500"
                                     style={{
@@ -1147,45 +1115,45 @@ export default function BuilderPage({
                   return (
                     <div
                       key={question.id}
-                      className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm print-card"
+                      className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm print:border-slate-300 print:bg-white print:break-inside-avoid"
                     >
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                        <span className="text-xs font-semibold text-white">
+                      <div className="flex items-center justify-between border-b border-slate-800 print:border-slate-200 pb-3 mb-4">
+                        <span className="text-xs font-semibold text-white print:text-slate-950">
                           {index + 1}. {question.title}
                         </span>
 
-                        <span className="text-[10px] font-mono text-indigo-400 uppercase">
+                        <span className="text-[10px] font-mono text-indigo-400 uppercase print:text-indigo-700">
                           {question.type.replace("_", " ")}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 text-center">
+                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-2.5 text-center">
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Total Entries
                           </div>
 
-                          <div className="text-sm font-bold text-white mt-0.5">
+                          <div className="text-sm font-bold text-white print:text-slate-950 mt-0.5">
                             {textAnswers.length}
                           </div>
                         </div>
 
-                        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 text-center">
+                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-2.5 text-center">
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Unique Answers
                           </div>
 
-                          <div className="text-sm font-bold text-indigo-400 mt-0.5">
+                          <div className="text-sm font-bold text-indigo-400 print:text-indigo-700 mt-0.5">
                             {new Set(textAnswers).size}
                           </div>
                         </div>
 
-                        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 text-center">
+                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-2.5 text-center">
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Response Rate
                           </div>
 
-                          <div className="text-sm font-bold text-emerald-400 mt-0.5">
+                          <div className="text-sm font-bold text-emerald-400 print:text-emerald-700 mt-0.5">
                             {completionRate}%
                           </div>
                         </div>
@@ -1200,7 +1168,7 @@ export default function BuilderPage({
                           textAnswers.map((text, responseIndex) => (
                             <div
                               key={`${question.id}-${responseIndex}`}
-                              className="text-xs text-slate-300 bg-slate-950/50 border border-slate-800/80 p-3 rounded-xl flex items-center justify-between gap-3"
+                              className="text-xs text-slate-300 print:text-slate-800 bg-slate-950/50 print:bg-slate-50 border border-slate-800/80 print:border-slate-200 p-3 rounded-xl flex items-center justify-between gap-3"
                             >
                               <span className="break-words">{text}</span>
 
