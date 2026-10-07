@@ -16,11 +16,13 @@ import {
   ChevronDown,
   Calendar,
   UploadCloud,
+  GraduationCap,
 } from "lucide-react";
 
 export type QuestionType =
   | "short_answer"
   | "email"
+  | "matric_number"
   | "multiple_choice"
   | "checkbox"
   | "dropdown"
@@ -67,6 +69,11 @@ const QUESTION_TYPES: QuestionTypeOption[] = [
     value: "email",
     label: "Email Address",
     icon: Mail,
+  },
+  {
+    value: "matric_number",
+    label: "OAU Matric Number",
+    icon: GraduationCap,
   },
   {
     value: "multiple_choice",
@@ -255,6 +262,14 @@ export default function SortableQuestionCard({
               <div className="mt-4">
                 <div className="w-full px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/50 text-xs text-slate-600">
                   Respondent short answer text entry...
+                </div>
+              </div>
+            )}
+
+            {question.type === "matric_number" && (
+              <div className="mt-4">
+                <div className="w-full px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/50 text-xs text-slate-600">
+                  e.g. EEG/2021/104
                 </div>
               </div>
             )}
