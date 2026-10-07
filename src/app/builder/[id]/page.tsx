@@ -1330,11 +1330,11 @@ export default function BuilderPage({
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h4 className="text-xs font-semibold text-white">
-                    Require Email Identification
+                    Require Official OAU Email
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    Require respondents to enter their @student.oauife.edu.ng
-                    address.
+                    Restricts submissions to verified @student.oauife.edu.ng and
+                    @oauife.edu.ng accounts.
                   </p>
                 </div>
                 <input

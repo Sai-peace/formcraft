@@ -83,3 +83,12 @@ export function parseOauMatric(matric: string): {
 
   return { code, department, year };
 }
+
+/**
+ * Matches either @student.oauife.edu.ng (students) or @oauife.edu.ng (staff/lecturers)
+ */
+export const OAU_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@(student\.)?oauife\.edu\.ng$/i;
+
+export function isValidOauEmail(email: string): boolean {
+  return OAU_EMAIL_REGEX.test(email.trim());
+}

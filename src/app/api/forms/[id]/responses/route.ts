@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isValidOauEmail } from "@/lib/departments";
 import { Resend } from "resend";
 
 const resend = process.env.RESEND_API_KEY
@@ -221,6 +222,21 @@ export async function POST(req: Request, { params }: RouteContext) {
       .trim()
       .toLowerCase();
     const submittedEmail = rawEmail && rawEmail.length > 0 ? rawEmail : null;
+
+    // Institutional domain restriction
+    if (
+      form.collectEmail &&
+      submittedEmail &&
+      !isValidOauEmail(submittedEmail)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Access restricted: Submissions require an official OAU account (@student.oauife.edu.ng or @oauife.edu.ng).",
+        },
+        { status: 403 },
+      );
+    }
 
     // Fast indexed SQL lookup for duplicate checks
     if (form.limitOnePerStudent) {

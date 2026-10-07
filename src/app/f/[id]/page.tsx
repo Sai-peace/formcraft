@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { isValidOauEmail } from "@/lib/departments";
 import {
   CheckCircle2,
   AlertCircle,
@@ -305,11 +306,19 @@ export default function PublicFormPage() {
     setErrorMsg(null);
 
     if (form?.collectEmail && stepIndex === 0) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const email = respondentEmail.trim();
 
-      if (!email || !emailRegex.test(email)) {
-        setErrorMsg("Please enter a valid email address to continue.");
+      if (!email) {
+        setErrorMsg(
+          "Please enter your official OAU email address to continue.",
+        );
+        return false;
+      }
+
+      if (!isValidOauEmail(email)) {
+        setErrorMsg(
+          "Access restricted: Submissions require an official OAU email (@student.oauife.edu.ng or @oauife.edu.ng).",
+        );
         return false;
       }
 
@@ -388,11 +397,17 @@ export default function PublicFormPage() {
     setErrorMsg(null);
 
     if (form?.collectEmail) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const email = respondentEmail.trim();
 
-      if (!email || !emailRegex.test(email)) {
-        setErrorMsg("Please enter a valid email address.");
+      if (!email) {
+        setErrorMsg("Please provide your official OAU email address.");
+        return;
+      }
+
+      if (!isValidOauEmail(email)) {
+        setErrorMsg(
+          "Submissions are restricted to official OAU accounts (@student.oauife.edu.ng or @oauife.edu.ng).",
+        );
         return;
       }
     }
@@ -782,12 +797,13 @@ export default function PublicFormPage() {
                     </span>
 
                     <h2 className="mt-5 text-2xl font-bold leading-tight sm:text-3xl">
-                      What is your official student email?
+                      What is your official OAU email?
                     </h2>
 
                     <p className="mt-3 text-sm leading-6 text-slate-400">
-                      Your institutional address will be securely recorded with
-                      your response.
+                      Submissions require an official account
+                      (@student.oauife.edu.ng for students or @oauife.edu.ng for
+                      staff).
                     </p>
                   </div>
 
@@ -795,7 +811,7 @@ export default function PublicFormPage() {
                     type="email"
                     value={respondentEmail}
                     onChange={(event) => setRespondentEmail(event.target.value)}
-                    placeholder="name@student.oauife.edu.ng"
+                    placeholder="e.g. jdoe@oauife.edu.ng or student@student.oauife.edu.ng"
                     autoFocus
                     style={{
                       borderColor: respondentEmail
@@ -891,7 +907,7 @@ export default function PublicFormPage() {
                       onChange={(event) =>
                         handleInputChange(currentFocusQ.id, event.target.value)
                       }
-                      placeholder="name@student.oauife.edu.ng"
+                      placeholder="e.g. name@student.oauife.edu.ng or staff@oauife.edu.ng"
                       autoFocus
                       className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
                     />
@@ -1156,7 +1172,7 @@ export default function PublicFormPage() {
               {form.collectEmail && (
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
                   <label className="text-sm font-semibold text-slate-200">
-                    Student Email Address{" "}
+                    Official OAU Email Address{" "}
                     <span className="text-rose-400">*</span>
                   </label>
 
@@ -1164,10 +1180,14 @@ export default function PublicFormPage() {
                     type="email"
                     value={respondentEmail}
                     onChange={(event) => setRespondentEmail(event.target.value)}
-                    placeholder="name@student.oauife.edu.ng"
+                    placeholder="e.g. jdoe@oauife.edu.ng or student@student.oauife.edu.ng"
                     required
                     className="mt-3 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
                   />
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Requires official account (@student.oauife.edu.ng or
+                    @oauife.edu.ng)
+                  </p>
                 </div>
               )}
 
@@ -1250,7 +1270,7 @@ export default function PublicFormPage() {
                       onChange={(event) =>
                         handleInputChange(question.id, event.target.value)
                       }
-                      placeholder="name@student.oauife.edu.ng"
+                      placeholder="e.g. name@student.oauife.edu.ng or staff@oauife.edu.ng"
                       className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-slate-500"
                     />
                   )}
