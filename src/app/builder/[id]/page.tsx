@@ -221,26 +221,30 @@ export default function BuilderPage({
         method: "POST",
       });
 
-      const data: {
-        error?: string;
-        insights?: AiInsightsData;
-      } = await res.json();
+      // Safely read text first to prevent JSON syntax crash if Vercel sends HTML
+      const rawText = await res.text();
+      let data: unknown = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error("Server took too long to respond. Please try again.");
+      }
+
+      const parsedData =
+        typeof data === "object" && data !== null
+          ? (data as { error?: string; insights?: AiInsightsData })
+          : {};
 
       if (!res.ok) {
-        setAiError(data.error || "Failed to generate AI insights.");
+        setAiError(parsedData.error || "Failed to generate AI insights.");
         return;
       }
 
-      if (!data.insights) {
-        setAiError("AI returned no insights.");
-        return;
-      }
-
-      setAiInsights(data.insights);
-    } catch (error) {
+      setAiInsights(parsedData.insights ?? null);
+    } catch (err: unknown) {
       const message =
-        error instanceof Error
-          ? error.message
+        err instanceof Error
+          ? err.message
           : "Failed to communicate with AI synthesizer.";
 
       setAiError(message);

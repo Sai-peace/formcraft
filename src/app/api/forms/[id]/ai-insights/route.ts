@@ -4,6 +4,10 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { GoogleGenAI } from "@google/genai";
 
+// Ensure Next.js doesn't cache and runs with max allowed serverless duration
+export const dynamic = "force-dynamic";
+export const maxDuration = 30; // Max allowed for Vercel functions
+
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
@@ -30,6 +34,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
         user: true,
         responses: {
           select: { answers: true, createdAt: true },
+          take: 60, // Limit sample size so payload stays small and generates fast
         },
       },
     });
@@ -87,25 +92,24 @@ export async function POST(_req: Request, { params }: RouteContext) {
         answersReadable[questionLabel] = val;
       });
 
-      return `Submission #\({index + 1}:\){JSON.stringify(answersReadable)}`;
+      return `Submission #${index + 1}: ${JSON.stringify(answersReadable)}`;
     });
 
     const prompt = `
-You are an executive data analyst for academic surveys at Obafemi Awolowo University.
-Analyze the following questionnaire responses for the form: "${form.title}".
+You are an executive data analyst for surveys at Obafemi Awolowo University.
+Analyze these responses for the questionnaire titled: "${form.title}".
 
-Questionnaire Description: ${form.description || "N/A"}
+Context:
 Total Responses: ${form.responses.length}
+Submissions Sample:
+${formattedSubmissions.join("\n")}
 
-Raw Submissions Data:
-${formattedSubmissions.slice(0, 150).join("\n")}
-
-Respond ONLY with a valid JSON object matching this exact schema:
+Respond ONLY with a valid raw JSON object (NO markdown backticks, NO markdown formatting) matching:
 {
-  "summary": "A concise 2-3 sentence overview of respondent sentiment and results.",
-  "sentiment": "Positive",
+  "summary": "2 concise sentences summarizing respondent consensus.",
+  "sentiment": "Neutral",
   "keyFindings": ["Finding 1", "Finding 2", "Finding 3"],
-  "recommendations": ["Recommendation 1", "Recommendation 2"]
+  "recommendations": ["Actionable step 1", "Actionable step 2"]
 }
 For sentiment, pick one of: "Positive", "Neutral", "Negative", or "Mixed".
 `;
@@ -113,8 +117,8 @@ For sentiment, pick one of: "Positive", "Neutral", "Negative", or "Mixed".
     let responseText = "";
     let lastError: unknown = null;
 
-    // Retry up to 3 times with progressive backoff if 503 high demand occurs
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    // Fast 2-attempt retry with short 800ms backoff to stay well inside the timeout limit
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const response = await ai.models.generateContent({
           model: "gemini-3.8-flash",
@@ -130,43 +134,49 @@ For sentiment, pick one of: "Positive", "Neutral", "Negative", or "Mixed".
         }
       } catch (err: unknown) {
         lastError = err;
-        const errorMessage = err instanceof Error ? err.message : String(err);
         console.warn(
-          `Attempt ${attempt} on gemini-3.8-flash failed:`,
-          errorMessage,
+          `Attempt ${attempt} failed:`,
+          err instanceof Error ? err.message : err,
         );
-
-        // If not the final attempt, pause before retrying
-        if (attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
         }
       }
     }
 
     if (!responseText) {
-      let errorMsg =
-        "The AI service is temporarily experiencing high traffic. Please retry in a few seconds.";
-      if (lastError instanceof Error && lastError.message) {
-        try {
-          const parsed = JSON.parse(lastError.message);
-          if (parsed?.error?.message) {
-            errorMsg = parsed.error.message;
-          }
-        } catch {
-          errorMsg = lastError.message;
-        }
-      } else if (lastError !== null) {
-        errorMsg = String(lastError);
-      }
-      return NextResponse.json({ error: errorMsg }, { status: 503 });
+      return NextResponse.json(
+        {
+          error:
+            "AI service was slow or busy. Please try clicking the button again.",
+        },
+        { status: 504 },
+      );
     }
 
-    const insights = JSON.parse(responseText);
+    // Clean potential markdown fencing (e.g. ```json ... ```)
+    let cleanJson = responseText;
+    if (cleanJson.startsWith("```")) {
+      cleanJson = cleanJson
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/```\s*$/, "");
+    }
+
+    let insights;
+    try {
+      insights = JSON.parse(cleanJson);
+    } catch {
+      return NextResponse.json(
+        { error: "AI output could not be formatted. Please try again." },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({ success: true, insights });
   } catch (error: unknown) {
     console.error("AI Insights backend error:", error);
     return NextResponse.json(
-      { error: "Failed to generate AI insights. Please retry shortly." },
+      { error: "Internal error analyzing responses. Please try again." },
       { status: 500 },
     );
   }
