@@ -19,6 +19,7 @@ type RouteContext = {
 type FormWithSettings = {
   id: string;
   title: string;
+  fields: string;
   published: boolean;
   deadline: Date | string | null;
   maxSubmissions: number | null;
@@ -216,12 +217,32 @@ export async function POST(req: Request, { params }: RouteContext) {
       parsedAnswersObj = body.answers as AnswersRecord;
     }
 
-    // One-submission-per-student check
+    // Parse question architecture to detect matric_number questions
+    let questions: Array<{ id: string; type: string }> = [];
+    try {
+      questions = JSON.parse(form.fields || "[]");
+    } catch {
+      questions = [];
+    }
+
+    const matricQuestionIds = questions
+      .filter((q) => q.type === "matric_number")
+      .map((q) => q.id);
+
     const studentEmail = String(parsedAnswersObj.respondent_email ?? "")
       .trim()
       .toLowerCase();
 
-    if (form.limitOnePerStudent && studentEmail) {
+    const submittedMatrics = matricQuestionIds
+      .map((qId) => parsedAnswersObj[qId])
+      .filter(
+        (val): val is string =>
+          typeof val === "string" && val.trim().length > 0,
+      )
+      .map((val) => val.trim().toUpperCase());
+
+    // One-submission-per-student check (Email AND Matric)
+    if (form.limitOnePerStudent) {
       const existingSubmissions = await prisma.response.findMany({
         where: {
           formId: id,
@@ -231,31 +252,50 @@ export async function POST(req: Request, { params }: RouteContext) {
         },
       });
 
-      const alreadySubmitted = existingSubmissions.some((submission) => {
+      for (const submission of existingSubmissions) {
+        let prevAnswers: Record<string, unknown> = {};
         try {
-          const parsed = JSON.parse(submission.answers) as Record<
+          prevAnswers = JSON.parse(submission.answers) as Record<
             string,
             unknown
           >;
-
-          return (
-            String(parsed.respondent_email ?? "")
-              .trim()
-              .toLowerCase() === studentEmail
-          );
         } catch {
-          return false;
+          prevAnswers = {};
         }
-      });
 
-      if (alreadySubmitted) {
-        return NextResponse.json(
-          {
-            error:
-              "Duplicate submission rejected: This OAU account has already submitted a response to this questionnaire.",
-          },
-          { status: 409 },
-        );
+        // Email duplicate check
+        if (studentEmail && prevAnswers.respondent_email) {
+          const prevEmail = String(prevAnswers.respondent_email)
+            .trim()
+            .toLowerCase();
+          if (prevEmail === studentEmail) {
+            return NextResponse.json(
+              {
+                error:
+                  "Duplicate submission rejected: This email address has already submitted a response.",
+              },
+              { status: 409 },
+            );
+          }
+        }
+
+        // Matric number duplicate check
+        if (submittedMatrics.length > 0) {
+          for (const qId of matricQuestionIds) {
+            const prevMatric = prevAnswers[qId];
+            if (
+              typeof prevMatric === "string" &&
+              submittedMatrics.includes(prevMatric.trim().toUpperCase())
+            ) {
+              return NextResponse.json(
+                {
+                  error: `Duplicate submission rejected: A response has already been recorded for matric number "${prevMatric}".`,
+                },
+                { status: 409 },
+              );
+            }
+          }
+        }
       }
     }
 
@@ -295,7 +335,6 @@ export async function POST(req: Request, { params }: RouteContext) {
       process.env.SMTP_PASS
     ) {
       const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-
       const formUrl = `${baseUrl}/builder/${id}`;
 
       transporter
@@ -306,12 +345,10 @@ export async function POST(req: Request, { params }: RouteContext) {
           html: `
             <div style="font-family: Arial, sans-serif; line-height: 1.6;">
               <h2>New Submission Recorded</h2>
-
               <p>
                 A new response has been submitted for
                 <strong>"${form.title}"</strong>.
               </p>
-
               <p>
                 <a
                   href="${formUrl}"
@@ -327,7 +364,6 @@ export async function POST(req: Request, { params }: RouteContext) {
                   View Responses in Dashboard →
                 </a>
               </p>
-
               <p>
                 FormCraft • Obafemi Awolowo University
               </p>
@@ -353,6 +389,55 @@ export async function POST(req: Request, { params }: RouteContext) {
 
     return NextResponse.json(
       { error: "Failed to save response" },
+      { status: 500 },
+    );
+  }
+}
+
+// DELETE /api/forms/[id]/responses - Wipe/purge all responses for this form
+export async function DELETE(_req: Request, { params }: RouteContext) {
+  try {
+    const { id } = await params;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Form ID is required" },
+        { status: 400 },
+      );
+    }
+
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const form = await prisma.form.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!form) {
+      return NextResponse.json({ error: "Form not found" }, { status: 404 });
+    }
+
+    if (form.user?.email !== session.user.email) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await prisma.response.deleteMany({
+      where: { formId: id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "All responses for this questionnaire have been deleted.",
+    });
+  } catch (error) {
+    console.error("DELETE all responses error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to delete responses." },
       { status: 500 },
     );
   }
