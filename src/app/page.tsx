@@ -488,40 +488,6 @@ export default function HomePage() {
                 Responses collected
               </p>
             </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-                  Domain Gate
-                </p>
-                <Shield className="h-4 w-4 text-cyan-400" />
-              </div>
-
-              <p className="mt-3 truncate text-sm font-bold text-white">
-                @student.oauife.edu.ng or @oauife.edu.ng
-              </p>
-
-              <p className="mt-1 text-[11px] text-slate-500">
-                Institutional access
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-purple-400">
-                  AI Synthesizer
-                </p>
-                <BrainCircuit className="h-4 w-4 text-purple-400" />
-              </div>
-
-              <p className="mt-3 text-sm font-bold text-white">
-                Active (3.8-Flash)
-              </p>
-
-              <p className="mt-1 text-[11px] text-purple-300/60">
-                Gemini generation ready
-              </p>
-            </div>
           </section>
 
           <section className="mt-6 overflow-hidden rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-indigo-950/30 p-5 sm:p-7">
