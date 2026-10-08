@@ -86,12 +86,11 @@ export default function HomePage() {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  // Dashboard-specific interactive states
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     const savedTheme = localStorage.getItem("oau_faas_theme");
-    return savedTheme === "light" ? "light" : "dark";
+    return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "dark";
   });
 
   const toggleTheme = () => {
@@ -297,11 +296,11 @@ export default function HomePage() {
       badge: "Administrative",
     },
     {
-      title: "FYP Supervisor Review",
-      desc: "Structured milestone questionnaires for undergraduate dissertation progress.",
+      title: "Final Year Project Research Survey",
+      desc: "Empirical questionnaire built for undergraduate theses, project field data, and student surveys.",
       icon: GraduationCap,
       accent: "from-amber-600 to-orange-600",
-      badge: "Research",
+      badge: "Project Work",
     },
   ];
 
@@ -325,9 +324,7 @@ export default function HomePage() {
     );
   }
 
-  // ==========================================
-  // AUTHENTICATED DASHBOARD WORKSPACE VIEW
-  // ==========================================
+  // AUTHENTICATED DASHBOARD VIEW
   if (session) {
     const isDark = theme === "dark";
 
@@ -346,7 +343,6 @@ export default function HomePage() {
           isDark ? "bg-slate-950 text-white" : "bg-[#F5F2EB] text-[#1F2937]"
         }`}
       >
-        {/* Navigation Header */}
         <header
           className={`sticky top-0 z-50 border-b backdrop-blur-xl transition-colors duration-200 ${
             isDark
@@ -355,7 +351,6 @@ export default function HomePage() {
           }`}
         >
           <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3.5 sm:px-6">
-            {/* Logo with Exit Modal Trigger */}
             <button
               type="button"
               onClick={() => setIsExitModalOpen(true)}
@@ -384,7 +379,6 @@ export default function HomePage() {
               </div>
             </button>
 
-            {/* Search Input */}
             <div className="relative ml-auto hidden min-w-0 max-w-md flex-1 md:block">
               <Search
                 className={`pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 ${
@@ -405,9 +399,7 @@ export default function HomePage() {
               />
             </div>
 
-            {/* Right Action Bar */}
             <div className="flex shrink-0 items-center gap-2.5">
-              {/* Theme Toggle Button */}
               <button
                 type="button"
                 onClick={toggleTheme}
@@ -480,7 +472,6 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Explicit Log Out Button */}
               <button
                 type="button"
                 onClick={() => void signOut()}
@@ -497,10 +488,9 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* Dashboard Content Container */}
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
           {/* Welcome Header */}
-          <section className="mb-10">
+          <section className="mb-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500">
@@ -614,8 +604,62 @@ export default function HomePage() {
             </div>
           </section>
 
+          {/* Prominent Gemini AI Prompt-to-Form Banner */}
+          <section
+            className={`mt-6 overflow-hidden rounded-3xl border p-6 sm:p-8 transition ${
+              isDark
+                ? "border-purple-500/20 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-indigo-950/30"
+                : "border-purple-200 bg-gradient-to-br from-purple-100/60 via-[#FAF8F3] to-indigo-50/60 shadow-sm"
+            }`}
+          >
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl">
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${
+                    isDark
+                      ? "border-purple-500/25 bg-purple-500/10 text-purple-300"
+                      : "border-purple-300 bg-purple-100 text-purple-900"
+                  }`}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Gemini Prompt-to-Form Engine
+                </div>
+
+                <h2
+                  className={`mt-4 text-xl font-extrabold sm:text-2xl ${
+                    isDark ? "text-white" : "text-[#111827]"
+                  }`}
+                >
+                  Architect Entire Questionnaires with One Prompt
+                </h2>
+
+                <p
+                  className={`mt-3 text-sm leading-6 ${
+                    isDark ? "text-slate-300" : "text-stone-600"
+                  }`}
+                >
+                  Describe what you need—undergraduate project data collection,
+                  course evaluation, or departmental clearance—and let Gemini
+                  generate questions, options, and logic instantly.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAiError(null);
+                  setIsAiModalOpen(true);
+                }}
+                className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-3.5 text-xs font-bold text-white shadow-lg shadow-purple-600/30 transition hover:scale-[1.02] hover:from-purple-500 hover:to-indigo-500"
+              >
+                <Wand2 className="h-4 w-4" />
+                Open AI Form Generator
+              </button>
+            </div>
+          </section>
+
           {/* Academic Form Templates */}
-          <section className="mt-12">
+          <section className="mt-10">
             <h2
               className={`text-2xl font-bold ${
                 isDark ? "text-white" : "text-[#111827]"
@@ -689,7 +733,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Active Forms Table/List */}
+          {/* Deployed Questionnaires */}
           <section className="mt-12">
             <div className="flex items-center justify-between">
               <div>
@@ -979,18 +1023,14 @@ export default function HomePage() {
     );
   }
 
-  // ==========================================
-  // UNAUTHENTICATED PUBLIC LANDING PAGE VIEW
-  // ==========================================
+  // PUBLIC LANDING VIEW
   return (
     <main className="min-h-screen overflow-x-hidden bg-slate-950 text-slate-100">
-      {/* Background Ambience */}
       <div className="pointer-events-none fixed inset-0 -z-0">
         <div className="absolute left-1/2 top-0 h-[600px] w-[1000px] -translate-x-1/2 rounded-full bg-indigo-600/10 blur-[140px]" />
         <div className="absolute right-0 top-1/3 h-[450px] w-[500px] rounded-full bg-blue-600/5 blur-[120px]" />
       </div>
 
-      {/* Navigation Header */}
       <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 sm:px-8 sm:py-5">
           <Link
@@ -1033,7 +1073,6 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero Section */}
       <section className="relative z-10 mx-auto max-w-5xl px-6 pb-20 pt-20 text-center sm:px-8 sm:pb-28 sm:pt-28">
         <div className="mx-auto inline-flex items-center gap-2.5 rounded-full border border-indigo-400/25 bg-indigo-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-indigo-300">
           <School className="h-4 w-4 text-indigo-400" />
@@ -1073,7 +1112,6 @@ export default function HomePage() {
         </p>
       </section>
 
-      {/* Architectural Capabilities */}
       <section className="relative z-10 border-y border-slate-800/80 bg-slate-900/40 px-6 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
@@ -1158,7 +1196,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Frequently Asked Questions */}
       <section className="relative z-10 px-6 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto max-w-3xl">
           <div className="text-center">
@@ -1206,7 +1243,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="relative z-10 border-t border-slate-800/80 bg-slate-950 px-6 py-10 sm:px-8 sm:py-12">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">

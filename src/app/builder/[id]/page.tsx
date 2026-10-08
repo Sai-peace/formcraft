@@ -134,6 +134,15 @@ export default function BuilderPage({
   const [generatingAi, setGeneratingAi] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
+  // Theme Sync with Dashboard
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window === "undefined") return "dark";
+    const savedTheme = localStorage.getItem("oau_faas_theme");
+    return savedTheme === "light" ? "light" : "dark";
+  });
+
+  const isDark = theme === "dark";
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -497,7 +506,9 @@ export default function BuilderPage({
 
   if (!form) {
     return (
-      <main className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <main
+        className={`min-h-screen flex items-center justify-center ${isDark ? "bg-slate-950 text-white" : "bg-[#F5F2EB] text-[#1F2937]"}`}
+      >
         <div className="flex flex-col items-center gap-3">
           <div className="w-9 h-9 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -536,22 +547,39 @@ export default function BuilderPage({
 }`;
 
   return (
-    <div className="min-h-screen bg-slate-950 print:bg-white text-slate-100 print:text-slate-950 antialiased selection:bg-indigo-500 selection:text-white">
+    <div
+      className={`min-h-screen print:bg-white antialiased transition-colors duration-200 ${
+        isDark
+          ? "bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white"
+          : "bg-[#F5F2EB] text-[#1F2937]"
+      }`}
+    >
       {/* Background Ambience */}
-      <div className="fixed inset-0 pointer-events-none z-0 print:hidden">
-        <div className="absolute -top-32 left-1/3 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[140px]" />
-      </div>
+      {isDark && (
+        <div className="fixed inset-0 pointer-events-none z-0 print:hidden">
+          <div className="absolute -top-32 left-1/3 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[140px]" />
+        </div>
+      )}
 
       {/* Institutional Studio Header */}
-      <header className="sticky top-0 z-40 bg-slate-950/85 border-b border-slate-800/80 backdrop-blur-xl print:hidden">
+      <header
+        className={`sticky top-0 z-40 border-b backdrop-blur-xl transition-colors duration-200 print:hidden ${
+          isDark
+            ? "bg-slate-950/85 border-slate-800/80"
+            : "bg-[#FAF8F3]/90 border-[#E3DDCF]"
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              {/* Logo / Return trigger with confirmation modal */}
               <button
                 type="button"
                 onClick={() => setIsExitModalOpen(true)}
-                className="group flex items-center gap-2 p-1.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 transition shrink-0 cursor-pointer"
+                className={`group flex items-center gap-2 p-1.5 rounded-xl border transition shrink-0 cursor-pointer ${
+                  isDark
+                    ? "border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
+                    : "border-[#DFD7C7] bg-[#FFFFFF] hover:bg-[#EFEAE0] text-stone-700"
+                }`}
                 title="Return to Workspace"
               >
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-[10px] font-black text-white">
@@ -572,7 +600,9 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="font-extrabold text-white text-base sm:text-lg bg-transparent border-b border-transparent hover:border-slate-700 focus:border-indigo-500 outline-none pb-0.5 w-44 sm:w-80 transition truncate"
+                  className={`font-extrabold text-base sm:text-lg bg-transparent border-b border-transparent hover:border-slate-700 focus:border-indigo-500 outline-none pb-0.5 w-44 sm:w-80 transition truncate ${
+                    isDark ? "text-white" : "text-[#111827]"
+                  }`}
                 />
               </div>
             </div>
@@ -606,7 +636,9 @@ export default function BuilderPage({
                 className={`hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-xs font-semibold transition cursor-pointer ${
                   form.published
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                    : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
+                    : isDark
+                      ? "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
+                      : "border-[#DFD7C7] bg-[#FFFFFF] text-stone-700 hover:bg-[#EFEAE0]"
                 }`}
               >
                 {form.published ? "Active (Live)" : "Draft Mode"}
@@ -615,7 +647,11 @@ export default function BuilderPage({
               <button
                 type="button"
                 onClick={() => setIsPreviewOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-800 transition cursor-pointer"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                  isDark
+                    ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800"
+                    : "bg-[#FFFFFF] hover:bg-[#EFEAE0] text-stone-800 border-[#DFD7C7]"
+                }`}
               >
                 <Eye size={14} />
                 <span>Preview</span>
@@ -623,15 +659,17 @@ export default function BuilderPage({
             </div>
           </div>
 
-          {/* Studio Navigation Tabs */}
+          {/* Navigation Tabs */}
           <div className="flex items-center gap-2 pb-2.5 overflow-x-auto">
             <button
               type="button"
               onClick={() => setActiveTab("builder")}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "builder"
-                  ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  : isDark
+                    ? "text-slate-400 hover:text-slate-200"
+                    : "text-stone-600 hover:text-stone-900"
               }`}
             >
               <Edit3 size={14} />
@@ -643,8 +681,10 @@ export default function BuilderPage({
               onClick={() => setActiveTab("responses")}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "responses"
-                  ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  : isDark
+                    ? "text-slate-400 hover:text-slate-200"
+                    : "text-stone-600 hover:text-stone-900"
               }`}
             >
               <BarChart3 size={14} />
@@ -656,8 +696,10 @@ export default function BuilderPage({
               onClick={() => setActiveTab("settings")}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "settings"
-                  ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  : isDark
+                    ? "text-slate-400 hover:text-slate-200"
+                    : "text-stone-600 hover:text-stone-900"
               }`}
             >
               <Sliders size={14} />
@@ -671,7 +713,13 @@ export default function BuilderPage({
       <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-8 print:max-w-full print:p-0">
         {activeTab === "builder" && (
           <div className="space-y-6">
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl">
+            <div
+              className={`border rounded-3xl p-6 sm:p-8 backdrop-blur-xl ${
+                isDark
+                  ? "bg-slate-900/60 border-slate-800"
+                  : "bg-[#FAF8F3] border-[#E0D8C8] shadow-sm"
+              }`}
+            >
               <input
                 type="text"
                 value={form.title}
@@ -681,7 +729,9 @@ export default function BuilderPage({
                   void saveForm(questions, updated);
                 }}
                 placeholder="Institutional Form Title"
-                className="w-full text-2xl sm:text-3xl font-extrabold text-white border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none pb-2 transition mb-3"
+                className={`w-full text-2xl sm:text-3xl font-extrabold border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none pb-2 transition mb-3 ${
+                  isDark ? "text-white" : "text-[#111827]"
+                }`}
               />
 
               <textarea
@@ -693,7 +743,9 @@ export default function BuilderPage({
                 }}
                 placeholder="Specify instructions, faculty guidelines, or eligibility criteria for respondents..."
                 rows={2}
-                className="w-full text-sm text-slate-300 border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none transition resize-none leading-relaxed"
+                className={`w-full text-sm border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none transition resize-none leading-relaxed ${
+                  isDark ? "text-slate-300" : "text-stone-600"
+                }`}
               />
             </div>
 
@@ -724,22 +776,31 @@ export default function BuilderPage({
               </SortableContext>
             </DndContext>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 print:hidden">
+            {/* UNIFIED SIDE-BY-SIDE BUTTON ROW */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 print:hidden">
               <button
                 type="button"
                 onClick={() => addQuestion("multiple_choice")}
-                className="py-4 border border-dashed border-slate-800 hover:border-indigo-500/60 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl text-slate-200 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+                className={`flex-1 w-full py-4 px-4 border rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                  isDark
+                    ? "border-dashed border-slate-800 bg-slate-900/40 hover:bg-slate-900/80 hover:border-indigo-500/50 text-slate-200"
+                    : "border-dashed border-[#DFD7C7] bg-[#FAF8F3] hover:bg-[#FFFFFF] hover:border-indigo-400 text-stone-800 shadow-sm"
+                }`}
               >
-                <Plus className="w-4 h-4 text-indigo-400" />
-                Add Standard Question Field
+                <Plus className="w-4 h-4 text-indigo-500" />
+                Add Standard Field
               </button>
 
               <button
                 type="button"
                 onClick={() => addQuestion("matric_number")}
-                className="py-4 border border-indigo-500/40 hover:border-indigo-500 bg-indigo-950/20 hover:bg-indigo-950/40 rounded-2xl text-indigo-200 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+                className={`flex-1 w-full py-4 px-4 border rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                  isDark
+                    ? "border-indigo-500/30 bg-indigo-950/20 hover:bg-indigo-950/40 text-indigo-300 hover:border-indigo-500"
+                    : "border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-900 hover:border-indigo-400 shadow-sm"
+                }`}
               >
-                <GraduationCap className="w-4 h-4 text-indigo-400" />
+                <GraduationCap className="w-4 h-4 text-indigo-600" />
                 Add Verified OAU Matric Field
               </button>
             </div>
@@ -748,15 +809,23 @@ export default function BuilderPage({
 
         {activeTab === "responses" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl print:border-slate-300 print:bg-white print:text-slate-950">
+            <div
+              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-3xl p-5 sm:p-6 backdrop-blur-xl ${
+                isDark
+                  ? "bg-slate-900/70 border-slate-800"
+                  : "bg-[#FAF8F3] border-[#E0D8C8] shadow-sm"
+              }`}
+            >
               <div>
-                <h3 className="text-lg font-bold text-white print:text-slate-950">
+                <h3
+                  className={`text-lg font-bold ${isDark ? "text-white" : "text-[#111827]"}`}
+                >
                   {responses.length}{" "}
                   {responses.length === 1 ? "Response" : "Responses"} Recorded
                 </h3>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse print:hidden" />
-                  <p className="text-xs text-slate-400 print:text-slate-600">
+                  <p className="text-xs text-slate-400">
                     Live database synchronization active
                   </p>
                 </div>
@@ -825,12 +894,20 @@ export default function BuilderPage({
               </div>
             </div>
 
-            {/* OAU Department Breakdown Card */}
+            {/* Department Breakdown */}
             {departmentBreakdown && departmentBreakdown.length > 0 && (
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl print:border-slate-300 print:bg-white print:text-slate-950">
-                <div className="flex items-center gap-2 mb-4 border-b border-slate-800 print:border-slate-200 pb-3">
-                  <GraduationCap className="h-4 w-4 text-indigo-400 print:text-indigo-700" />
-                  <h4 className="text-sm font-bold text-white print:text-slate-950">
+              <div
+                className={`border rounded-3xl p-6 backdrop-blur-xl ${
+                  isDark
+                    ? "bg-slate-900/60 border-slate-800"
+                    : "bg-[#FAF8F3] border-[#E0D8C8]"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-4 border-b border-slate-800 pb-3">
+                  <GraduationCap className="h-4 w-4 text-indigo-400" />
+                  <h4
+                    className={`text-sm font-bold ${isDark ? "text-white" : "text-[#111827]"}`}
+                  >
                     OAU Department Distribution Breakdown
                   </h4>
                 </div>
@@ -839,17 +916,23 @@ export default function BuilderPage({
                   {departmentBreakdown.map((dept) => (
                     <div
                       key={dept.name}
-                      className="p-3.5 rounded-2xl bg-slate-950/50 print:bg-slate-50 border border-slate-800/80 print:border-slate-200 flex items-center justify-between"
+                      className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+                        isDark
+                          ? "bg-slate-950/50 border-slate-800/80"
+                          : "bg-[#FFFFFF] border-[#DFD7C7]"
+                      }`}
                     >
                       <div className="min-w-0 pr-2">
-                        <p className="text-xs font-semibold text-slate-200 print:text-slate-800 truncate">
+                        <p
+                          className={`text-xs font-semibold truncate ${isDark ? "text-slate-200" : "text-stone-800"}`}
+                        >
                           {dept.name}
                         </p>
                         <p className="text-[10px] text-slate-400">
                           {dept.count} verified submissions
                         </p>
                       </div>
-                      <span className="font-mono text-xs font-bold text-indigo-400 print:text-indigo-700">
+                      <span className="font-mono text-xs font-bold text-indigo-500">
                         {dept.percent}%
                       </span>
                     </div>
@@ -866,18 +949,18 @@ export default function BuilderPage({
             )}
 
             {aiInsights && (
-              <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden print:border-slate-300 print:bg-white print:text-slate-950 print:shadow-none">
+              <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-purple-600/30 border border-purple-500/30 text-purple-300 flex items-center justify-center print:border-slate-300 print:text-purple-700">
+                    <div className="h-9 w-9 rounded-xl bg-purple-600/30 border border-purple-500/30 text-purple-300 flex items-center justify-center">
                       <BrainCircuit className="h-5 w-5" />
                     </div>
 
                     <div>
-                      <h4 className="font-bold text-white print:text-slate-950 text-base">
+                      <h4 className="font-bold text-white text-base">
                         AI Executive Synthesis
                       </h4>
-                      <p className="text-xs text-slate-400 print:text-slate-600">
+                      <p className="text-xs text-slate-400">
                         Synthesized across {responses.length} responses with
                         Gemini
                       </p>
@@ -887,24 +970,24 @@ export default function BuilderPage({
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold border ${
                       aiInsights.sentiment === "Positive"
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 print:text-emerald-700"
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                         : aiInsights.sentiment === "Negative"
-                          ? "bg-rose-500/10 text-rose-400 border-rose-500/20 print:text-rose-700"
-                          : "bg-amber-500/10 text-amber-400 border-amber-500/20 print:text-amber-700"
+                          ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                     }`}
                   >
                     {aiInsights.sentiment} Sentiment
                   </span>
                 </div>
 
-                <p className="text-xs leading-relaxed text-slate-200 print:text-slate-800 mb-5 bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-2xl p-4">
+                <p className="text-xs leading-relaxed text-slate-200 mb-5 bg-slate-950/60 border border-slate-800 rounded-2xl p-4">
                   {aiInsights.summary}
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-slate-950/50 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-2xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300 print:text-purple-700 mb-2.5">
-                      <TrendingUp className="h-3.5 w-3.5 text-purple-400 print:text-purple-700" />
+                  <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300 mb-2.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-purple-400" />
                       <span>Consensus & Trends</span>
                     </div>
 
@@ -912,18 +995,18 @@ export default function BuilderPage({
                       {aiInsights.keyFindings.map((finding, fIdx) => (
                         <li
                           key={fIdx}
-                          className="text-xs text-slate-400 print:text-slate-700 flex items-start gap-2"
+                          className="text-xs text-slate-400 flex items-start gap-2"
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-purple-400 print:bg-purple-700 mt-1.5 shrink-0" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
                           <span>{finding}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="bg-slate-950/50 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-2xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300 print:text-indigo-700 mb-2.5">
-                      <Lightbulb className="h-3.5 w-3.5 text-indigo-400 print:text-indigo-700" />
+                  <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300 mb-2.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-indigo-400" />
                       <span>Actionable Recommendations</span>
                     </div>
 
@@ -931,9 +1014,9 @@ export default function BuilderPage({
                       {aiInsights.recommendations.map((rec, rIdx) => (
                         <li
                           key={rIdx}
-                          className="text-xs text-slate-400 print:text-slate-700 flex items-start gap-2"
+                          className="text-xs text-slate-400 flex items-start gap-2"
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 print:bg-indigo-700 mt-1.5 shrink-0" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
                           <span>{rec}</span>
                         </li>
                       ))}
@@ -948,12 +1031,20 @@ export default function BuilderPage({
                 Fetching response records...
               </div>
             ) : responses.length === 0 ? (
-              <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-12 text-center print:border-slate-300 print:text-slate-950">
-                <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                <h4 className="font-bold text-white print:text-slate-950 text-base">
+              <div
+                className={`border border-dashed rounded-3xl p-12 text-center ${
+                  isDark
+                    ? "bg-slate-900/40 border-slate-800"
+                    : "bg-[#FAF8F3] border-[#DFD7C7]"
+                }`}
+              >
+                <BarChart3 className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+                <h4
+                  className={`font-bold text-base ${isDark ? "text-white" : "text-[#111827]"}`}
+                >
                   Awaiting Responses
                 </h4>
-                <p className="text-xs text-slate-400 print:text-slate-600 mt-1">
+                <p className="text-xs text-slate-400 mt-1">
                   Share your public questionnaire link to begin aggregating
                   institutional data.
                 </p>
@@ -1023,13 +1114,19 @@ export default function BuilderPage({
                     return (
                       <div
                         key={question.id}
-                        className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm print:border-slate-300 print:bg-white print:break-inside-avoid"
+                        className={`border rounded-3xl p-6 backdrop-blur-sm ${
+                          isDark
+                            ? "bg-slate-900/60 border-slate-800"
+                            : "bg-[#FAF8F3] border-[#E0D8C8]"
+                        }`}
                       >
-                        <div className="flex items-center justify-between border-b border-slate-800 print:border-slate-200 pb-3 mb-5">
-                          <span className="text-base font-bold text-white print:text-slate-950">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
+                          <span
+                            className={`text-base font-bold ${isDark ? "text-white" : "text-[#111827]"}`}
+                          >
                             {index + 1}. {question.title}
                           </span>
-                          <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 print:border-slate-300 print:text-indigo-700">
+                          <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
                             {question.type.replace("_", " ")}
                           </span>
                         </div>
@@ -1045,7 +1142,9 @@ export default function BuilderPage({
                                   cx="50"
                                   cy="50"
                                   r="40"
-                                  className="text-slate-800 print:text-slate-200"
+                                  className={
+                                    isDark ? "text-slate-800" : "text-stone-300"
+                                  }
                                   strokeWidth="12"
                                   stroke="currentColor"
                                   fill="transparent"
@@ -1068,7 +1167,9 @@ export default function BuilderPage({
                               </svg>
 
                               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                <span className="text-xl font-extrabold text-white print:text-slate-950 font-mono">
+                                <span
+                                  className={`text-xl font-extrabold font-mono ${isDark ? "text-white" : "text-[#111827]"}`}
+                                >
                                   {totalVotes}
                                 </span>
                                 <span className="text-[10px] text-slate-500 uppercase tracking-wider">
@@ -1082,7 +1183,11 @@ export default function BuilderPage({
                             {segments.map((seg) => (
                               <div
                                 key={seg.opt}
-                                className="p-3.5 rounded-2xl bg-slate-950/60 print:bg-slate-50 border border-slate-800/80 print:border-slate-200"
+                                className={`p-3.5 rounded-2xl border ${
+                                  isDark
+                                    ? "bg-slate-950/60 border-slate-800/80"
+                                    : "bg-[#FFFFFF] border-[#DFD7C7]"
+                                }`}
                               >
                                 <div className="flex items-center justify-between text-xs mb-1.5">
                                   <div className="flex items-center gap-2">
@@ -1090,16 +1195,22 @@ export default function BuilderPage({
                                       className="h-2.5 w-2.5 rounded-full shrink-0"
                                       style={{ backgroundColor: seg.color }}
                                     />
-                                    <span className="font-semibold text-slate-200 print:text-slate-800">
+                                    <span
+                                      className={`font-semibold ${isDark ? "text-slate-200" : "text-stone-800"}`}
+                                    >
                                       {seg.opt}
                                     </span>
                                   </div>
-                                  <span className="font-mono font-semibold text-slate-300 print:text-slate-700">
+                                  <span
+                                    className={`font-mono font-semibold ${isDark ? "text-slate-300" : "text-stone-600"}`}
+                                  >
                                     {seg.count} ({seg.percent}%)
                                   </span>
                                 </div>
 
-                                <div className="w-full h-2 bg-slate-800 print:bg-slate-200 rounded-full overflow-hidden">
+                                <div
+                                  className={`w-full h-2 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-stone-200"}`}
+                                >
                                   <div
                                     className="h-full rounded-full transition-all duration-500"
                                     style={{
@@ -1132,32 +1243,52 @@ export default function BuilderPage({
                   return (
                     <div
                       key={question.id}
-                      className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm print:border-slate-300 print:bg-white print:break-inside-avoid"
+                      className={`border rounded-2xl p-5 backdrop-blur-sm ${
+                        isDark
+                          ? "bg-slate-900/60 border-slate-800"
+                          : "bg-[#FAF8F3] border-[#E0D8C8]"
+                      }`}
                     >
-                      <div className="flex items-center justify-between border-b border-slate-800 print:border-slate-200 pb-3 mb-4">
-                        <span className="text-sm font-bold text-white print:text-slate-950">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                        <span
+                          className={`text-sm font-bold ${isDark ? "text-white" : "text-[#111827]"}`}
+                        >
                           {index + 1}. {question.title}
                         </span>
-                        <span className="text-[10px] font-mono text-indigo-400 uppercase print:text-indigo-700">
+                        <span className="text-[10px] font-mono text-indigo-400 uppercase">
                           {question.type.replace("_", " ")}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-3 text-center">
+                        <div
+                          className={`border rounded-xl p-3 text-center ${
+                            isDark
+                              ? "bg-slate-950/60 border-slate-800"
+                              : "bg-[#FFFFFF] border-[#DFD7C7]"
+                          }`}
+                        >
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Total Records
                           </div>
-                          <div className="text-sm font-bold text-white print:text-slate-950 mt-0.5">
+                          <div
+                            className={`text-sm font-bold mt-0.5 ${isDark ? "text-white" : "text-[#111827]"}`}
+                          >
                             {textRecords.length}
                           </div>
                         </div>
 
-                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-3 text-center">
+                        <div
+                          className={`border rounded-xl p-3 text-center ${
+                            isDark
+                              ? "bg-slate-950/60 border-slate-800"
+                              : "bg-[#FFFFFF] border-[#DFD7C7]"
+                          }`}
+                        >
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
                             Unique Entries
                           </div>
-                          <div className="text-sm font-bold text-indigo-400 print:text-indigo-700 mt-0.5">
+                          <div className="text-sm font-bold text-indigo-500 mt-0.5">
                             {
                               new Set(textRecords.map((r) => String(r.val)))
                                 .size
@@ -1176,7 +1307,11 @@ export default function BuilderPage({
                           textRecords.map((item, recIdx) => (
                             <div
                               key={item.id}
-                              className="text-xs text-slate-300 print:text-slate-800 bg-slate-950/50 print:bg-slate-50 border border-slate-800/80 print:border-slate-200 p-3 rounded-xl flex items-center justify-between gap-3"
+                              className={`border p-3 rounded-xl flex items-center justify-between gap-3 text-xs ${
+                                isDark
+                                  ? "text-slate-300 bg-slate-950/50 border-slate-800/80"
+                                  : "text-stone-800 bg-[#FFFFFF] border-[#DFD7C7]"
+                              }`}
                             >
                               <span className="break-words flex-1">
                                 {typeof item.val === "object"
@@ -1213,9 +1348,17 @@ export default function BuilderPage({
 
         {activeTab === "settings" && (
           <div className="space-y-6">
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+            <div
+              className={`border rounded-3xl p-6 backdrop-blur-xl space-y-4 ${
+                isDark
+                  ? "bg-slate-900/60 border-slate-800"
+                  : "bg-[#FAF8F3] border-[#E0D8C8]"
+              }`}
+            >
               <div>
-                <h3 className="font-bold text-white text-base">
+                <h3
+                  className={`font-bold text-base ${isDark ? "text-white" : "text-[#111827]"}`}
+                >
                   Respondent Color Accent
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
@@ -1239,14 +1382,18 @@ export default function BuilderPage({
                       className={`p-3 rounded-2xl border flex items-center gap-3 transition cursor-pointer text-left ${
                         isSelected
                           ? "border-indigo-500 bg-indigo-500/10 shadow-sm"
-                          : "border-slate-800 hover:border-slate-700 bg-slate-950/40"
+                          : isDark
+                            ? "border-slate-800 hover:border-slate-700 bg-slate-950/40"
+                            : "border-[#DFD7C7] hover:border-stone-400 bg-[#FFFFFF]"
                       }`}
                     >
                       <span
                         className="w-5 h-5 rounded-full border border-slate-700 shrink-0"
                         style={{ backgroundColor: th.color }}
                       />
-                      <span className="flex-1 text-xs font-semibold text-slate-200">
+                      <span
+                        className={`flex-1 text-xs font-semibold ${isDark ? "text-slate-200" : "text-stone-800"}`}
+                      >
                         {th.name}
                       </span>
                       {isSelected && (
@@ -1260,14 +1407,24 @@ export default function BuilderPage({
               </div>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
-              <h3 className="font-bold text-white text-base">
+            <div
+              className={`border rounded-3xl p-6 backdrop-blur-xl space-y-5 ${
+                isDark
+                  ? "bg-slate-900/60 border-slate-800"
+                  : "bg-[#FAF8F3] border-[#E0D8C8]"
+              }`}
+            >
+              <h3
+                className={`font-bold text-base ${isDark ? "text-white" : "text-[#111827]"}`}
+              >
                 Submission Quotas & Schedules
               </h3>
 
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-xs font-semibold text-white">
+                  <h4
+                    className={`text-xs font-semibold ${isDark ? "text-white" : "text-[#111827]"}`}
+                  >
                     Accept Submissions
                   </h4>
                   <p className="text-[11px] text-slate-400">
@@ -1304,7 +1461,11 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
+                  className={`w-full text-xs border rounded-xl p-3 outline-none focus:border-indigo-500 transition ${
+                    isDark
+                      ? "bg-slate-950/80 border-slate-800 text-white"
+                      : "bg-[#FFFFFF] border-[#DFD7C7] text-stone-900"
+                  }`}
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
                   Leave blank for unlimited campus submissions.
@@ -1330,19 +1491,33 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
+                  className={`w-full text-xs border rounded-xl p-3 outline-none focus:border-indigo-500 transition ${
+                    isDark
+                      ? "bg-slate-950/80 border-slate-800 text-white"
+                      : "bg-[#FFFFFF] border-[#DFD7C7] text-stone-900"
+                  }`}
                 />
               </div>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
-              <h3 className="font-bold text-white text-base">
+            <div
+              className={`border rounded-3xl p-6 backdrop-blur-xl space-y-4 ${
+                isDark
+                  ? "bg-slate-900/60 border-slate-800"
+                  : "bg-[#FAF8F3] border-[#E0D8C8]"
+              }`}
+            >
+              <h3
+                className={`font-bold text-base ${isDark ? "text-white" : "text-[#111827]"}`}
+              >
                 Campus Security & Verification
               </h3>
 
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-xs font-semibold text-white">
+                  <h4
+                    className={`text-xs font-semibold ${isDark ? "text-white" : "text-[#111827]"}`}
+                  >
                     Require Official OAU Email
                   </h4>
                   <p className="text-[11px] text-slate-400">
@@ -1364,7 +1539,9 @@ export default function BuilderPage({
 
               <div className="border-t border-slate-800/80 pt-4 flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-xs font-semibold text-white">
+                  <h4
+                    className={`text-xs font-semibold ${isDark ? "text-white" : "text-[#111827]"}`}
+                  >
                     One Response Per Student (Email & Matric)
                   </h4>
                   <p className="text-[11px] text-slate-400">
@@ -1389,10 +1566,18 @@ export default function BuilderPage({
               </div>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+            <div
+              className={`border rounded-3xl p-6 backdrop-blur-xl space-y-4 ${
+                isDark
+                  ? "bg-slate-900/60 border-slate-800"
+                  : "bg-[#FAF8F3] border-[#E0D8C8]"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-bold text-white text-base">
+                  <h3
+                    className={`font-bold text-base ${isDark ? "text-white" : "text-[#111827]"}`}
+                  >
                     Automated Webhook Integration
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
@@ -1403,7 +1588,11 @@ export default function BuilderPage({
                 <button
                   type="button"
                   onClick={() => setShowScriptModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+                    isDark
+                      ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
+                      : "bg-[#FFFFFF] hover:bg-[#EFEAE0] text-stone-800 border-[#DFD7C7]"
+                  }`}
                 >
                   <Code2 size={13} />
                   <span>Google Apps Script</span>
@@ -1423,13 +1612,25 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition font-mono"
+                  className={`w-full text-xs border rounded-xl p-3 outline-none focus:border-indigo-500 transition font-mono ${
+                    isDark
+                      ? "bg-slate-950/80 border-slate-800 text-white"
+                      : "bg-[#FFFFFF] border-[#DFD7C7] text-stone-900"
+                  }`}
                 />
               </div>
             </div>
 
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
-              <h3 className="font-bold text-white text-base">
+            <div
+              className={`border rounded-3xl p-6 backdrop-blur-xl space-y-5 ${
+                isDark
+                  ? "bg-slate-900/60 border-slate-800"
+                  : "bg-[#FAF8F3] border-[#E0D8C8]"
+              }`}
+            >
+              <h3
+                className={`font-bold text-base ${isDark ? "text-white" : "text-[#111827]"}`}
+              >
                 Confirmation & Feedback Experience
               </h3>
 
@@ -1446,7 +1647,11 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition resize-none"
+                  className={`w-full text-xs border rounded-xl p-3 outline-none focus:border-indigo-500 transition resize-none ${
+                    isDark
+                      ? "bg-slate-950/80 border-slate-800 text-white"
+                      : "bg-[#FFFFFF] border-[#DFD7C7] text-stone-900"
+                  }`}
                 />
               </div>
 
@@ -1463,7 +1668,11 @@ export default function BuilderPage({
                     setForm(updated);
                     void saveForm(questions, updated);
                   }}
-                  className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
+                  className={`w-full text-xs border rounded-xl p-3 outline-none focus:border-indigo-500 transition ${
+                    isDark
+                      ? "bg-slate-950/80 border-slate-800 text-white"
+                      : "bg-[#FFFFFF] border-[#DFD7C7] text-stone-900"
+                  }`}
                 />
               </div>
             </div>

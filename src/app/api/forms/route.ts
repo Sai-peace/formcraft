@@ -131,48 +131,69 @@ const TEMPLATES: Record<
       },
     ],
   },
-  "FYP Supervisor Review": {
-    title: "Final Year Project (FYP) Supervisor Progress Check",
+  "Final Year Project Research Survey": {
+    title: "Undergraduate Final Year Project (FYP) Research Survey",
     description:
-      "Structured milestone questionnaire for undergraduate dissertation chapters, prototype milestones, and supervisor sign-offs.",
+      "Empirical field questionnaire designed for final year students collecting primary data for chapter 3 and 4 thesis analysis.",
     fields: [
       {
         id: "q-fyp-1",
-        title: "Approved Project Title / Research Topic",
-        type: "short_answer",
+        title: "Respondent Demographic Level",
+        type: "dropdown",
+        options: [
+          "Undergraduate Student",
+          "Postgraduate Researcher",
+          "Academic Staff",
+          "External Participant",
+        ],
         required: true,
       },
       {
         id: "q-fyp-2",
-        title: "Name of Lead Project Supervisor",
-        type: "short_answer",
+        title: "Faculty / Area of Specialization",
+        type: "dropdown",
+        options: [
+          "Technology / Engineering",
+          "Sciences",
+          "Health Sciences / Basic Medical",
+          "Administration / Social Sciences",
+          "Arts / Education",
+        ],
         required: true,
       },
       {
         id: "q-fyp-3",
-        title: "Current Research Milestone Completed",
-        type: "dropdown",
+        title:
+          "How frequently do you utilize the proposed technology or methodology in your daily workflow?",
+        type: "multiple_choice",
         options: [
-          "Chapter 1 - 3 (Proposal & Literature Review)",
-          "Chapter 4 - System Design / Experimental Methodology",
-          "Prototype Implementation & Hardware/Software Testing",
-          "Chapter 5 - Results, Discussion & Conclusion",
-          "Final Pre-Defense Defense Draft",
+          "Daily (Extremely Frequent)",
+          "Weekly (Moderate)",
+          "Occasionally / Rarely",
+          "Never utilized before",
         ],
         required: true,
       },
       {
         id: "q-fyp-4",
         title:
-          "Key hardware or software blockers currently hindering milestone completion",
-        type: "short_answer",
-        required: false,
+          "Rate the effectiveness of the system/process based on current implementations",
+        type: "multiple_choice",
+        options: [
+          "5 - Highly Effective",
+          "4 - Moderately Effective",
+          "3 - Neutral / Average",
+          "2 - Ineffective",
+          "1 - Critically Deficient",
+        ],
+        required: true,
       },
       {
         id: "q-fyp-5",
-        title: "Next Scheduled Supervisor Consultation Date",
-        type: "date",
-        required: true,
+        title:
+          "What key bottlenecks or limitations should this research prioritize addressing?",
+        type: "short_answer",
+        required: false,
       },
     ],
   },
@@ -215,7 +236,7 @@ export async function GET() {
   }
 }
 
-// POST /api/forms - Create a new form with template support
+// POST /api/forms
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
 
@@ -247,7 +268,6 @@ export async function POST(req: Request) {
       },
     ];
 
-    // Check if the requested title matches one of our institutional template presets
     if (requestedTemplate && TEMPLATES[requestedTemplate]) {
       const preset = TEMPLATES[requestedTemplate];
       formTitle = preset.title;
