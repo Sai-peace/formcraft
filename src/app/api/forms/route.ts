@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// Predefined template field presets
+// Realistic OAU Academic & Institutional Template Presets
 const TEMPLATES: Record<
   string,
   {
@@ -18,125 +18,161 @@ const TEMPLATES: Record<
     }[];
   }
 > = {
-  "Customer Feedback": {
-    title: "Customer Feedback Survey",
+  "Course & Lecturer Evaluation": {
+    title: "Course & Lecturer Evaluation Survey",
     description:
-      "We value your feedback! Help us improve our product and experience.",
-    fields: [
-      {
-        id: "q-fb-1",
-        title: "How satisfied are you with our product?",
-        type: "multiple_choice",
-        options: ["Very Satisfied", "Satisfied", "Neutral", "Unsatisfied"],
-        required: true,
-      },
-      {
-        id: "q-fb-2",
-        title: "Which features do you use most frequently?",
-        type: "checkbox",
-        options: [
-          "Form Builder",
-          "Live Analytics",
-          "CSV Export",
-          "Custom Styling",
-        ],
-        required: false,
-      },
-      {
-        id: "q-fb-3",
-        title: "How likely are you to recommend us to a colleague?",
-        type: "dropdown",
-        options: [
-          "10 - Extremely Likely",
-          "8 - Likely",
-          "5 - Neutral",
-          "1 - Unlikely",
-        ],
-        required: true,
-      },
-      {
-        id: "q-fb-4",
-        title: "What is one thing we could improve?",
-        type: "short_answer",
-        required: false,
-      },
-    ],
-  },
-  "Event RSVP": {
-    title: "Event RSVP & Registration",
-    description:
-      "Please confirm your attendance and preferences for our upcoming gathering.",
-    fields: [
-      {
-        id: "q-rsvp-1",
-        title: "Full Name",
-        type: "short_answer",
-        required: true,
-      },
-      {
-        id: "q-rsvp-2",
-        title: "Will you be attending in person?",
-        type: "multiple_choice",
-        options: [
-          "Yes, attending in person",
-          "Attending virtually",
-          "Cannot make it",
-        ],
-        required: true,
-      },
-      {
-        id: "q-rsvp-3",
-        title: "Dietary Preferences or Restrictions",
-        type: "dropdown",
-        options: [
-          "No dietary restrictions",
-          "Vegetarian",
-          "Vegan",
-          "Halal",
-          "Gluten-Free",
-        ],
-        required: false,
-      },
-      {
-        id: "q-rsvp-4",
-        title: "Preferred Arrival Date",
-        type: "date",
-        required: false,
-      },
-    ],
-  },
-  "Course Evaluation": {
-    title: "Course & Instructor Evaluation",
-    description:
-      "Please share honest feedback on this course module and the teaching methodology.",
+      "Official end-of-semester course feedback and teaching assessment for Obafemi Awolowo University faculties.",
     fields: [
       {
         id: "q-ce-1",
-        title: "Course Code / Title",
+        title: "Course Code & Title (e.g. CPE 501 / EEE 301)",
         type: "short_answer",
         required: true,
       },
       {
         id: "q-ce-2",
-        title:
-          "The course objectives and assignments were clearly communicated.",
-        type: "multiple_choice",
-        options: ["Strongly Agree", "Agree", "Neutral", "Disagree"],
+        title: "Academic Level",
+        type: "dropdown",
+        options: [
+          "Part 1 (100L)",
+          "Part 2 (200L)",
+          "Part 3 (300L)",
+          "Part 4 (400L)",
+          "Part 5 (500L)",
+          "Postgraduate",
+        ],
         required: true,
       },
       {
         id: "q-ce-3",
-        title: "Rate the pacing and delivery of lectures",
-        type: "dropdown",
-        options: ["Just Right", "Too Fast", "Too Slow"],
+        title:
+          "How clearly were the syllabus objectives and course materials communicated?",
+        type: "multiple_choice",
+        options: [
+          "5 - Exceptionally Clear",
+          "4 - Clear and Well-Structured",
+          "3 - Satisfactory",
+          "2 - Moderately Unclear",
+          "1 - Very Poor / Disorganized",
+        ],
         required: true,
       },
       {
         id: "q-ce-4",
         title:
-          "What topic was most beneficial or requires further elaboration?",
+          "Pacing of lectures, class punctuality, and practical demonstrations",
+        type: "dropdown",
+        options: [
+          "Optimal pace & consistent attendance",
+          "Paced too quickly for syllabus coverage",
+          "Slow pacing / irregular lectures",
+          "Practical sessions were insufficient",
+        ],
+        required: true,
+      },
+      {
+        id: "q-ce-5",
+        title:
+          "What constructive recommendations would you suggest for the course lecturer?",
         type: "short_answer",
         required: false,
+      },
+    ],
+  },
+  "Departmental Clearance Verification": {
+    title: "Departmental Clearance & Dues Verification",
+    description:
+      "Official clearance record submission for departmental association registration, dues vetting, and graduating student verification.",
+    fields: [
+      {
+        id: "q-cl-1",
+        title: "Full Student Name (Surname First)",
+        type: "short_answer",
+        required: true,
+      },
+      {
+        id: "q-cl-2",
+        title: "Matriculation Number (e.g., CHE/2021/045)",
+        type: "short_answer",
+        required: true,
+      },
+      {
+        id: "q-cl-3",
+        title: "Faculty & Department",
+        type: "dropdown",
+        options: [
+          "Faculty of Technology - Computer Science & Engineering",
+          "Faculty of Technology - Electronic & Electrical Engineering",
+          "Faculty of Technology - Mechanical Engineering",
+          "Faculty of Science - Physics",
+          "Faculty of Science - Chemistry",
+          "Faculty of Administration - Management & Accounting",
+          "Other Department",
+        ],
+        required: true,
+      },
+      {
+        id: "q-cl-4",
+        title: "Academic Session & Current Clearance Status",
+        type: "multiple_choice",
+        options: [
+          "Full Dues Paid - Awaiting Receipt Stamp",
+          "Half Installment Paid",
+          "Final Year Graduating Clearance",
+          "Exempted / Scholarship Status",
+        ],
+        required: true,
+      },
+      {
+        id: "q-cl-5",
+        title: "Bank Remita RRR or Transaction Reference Number",
+        type: "short_answer",
+        required: true,
+      },
+    ],
+  },
+  "FYP Supervisor Review": {
+    title: "Final Year Project (FYP) Supervisor Progress Check",
+    description:
+      "Structured milestone questionnaire for undergraduate dissertation chapters, prototype milestones, and supervisor sign-offs.",
+    fields: [
+      {
+        id: "q-fyp-1",
+        title: "Approved Project Title / Research Topic",
+        type: "short_answer",
+        required: true,
+      },
+      {
+        id: "q-fyp-2",
+        title: "Name of Lead Project Supervisor",
+        type: "short_answer",
+        required: true,
+      },
+      {
+        id: "q-fyp-3",
+        title: "Current Research Milestone Completed",
+        type: "dropdown",
+        options: [
+          "Chapter 1 - 3 (Proposal & Literature Review)",
+          "Chapter 4 - System Design / Experimental Methodology",
+          "Prototype Implementation & Hardware/Software Testing",
+          "Chapter 5 - Results, Discussion & Conclusion",
+          "Final Pre-Defense Defense Draft",
+        ],
+        required: true,
+      },
+      {
+        id: "q-fyp-4",
+        title:
+          "Key hardware or software blockers currently hindering milestone completion",
+        type: "short_answer",
+        required: false,
+      },
+      {
+        id: "q-fyp-5",
+        title: "Next Scheduled Supervisor Consultation Date",
+        type: "date",
+        required: true,
       },
     ],
   },
@@ -211,7 +247,7 @@ export async function POST(req: Request) {
       },
     ];
 
-    // Check if the requested title matches one of our template presets
+    // Check if the requested title matches one of our institutional template presets
     if (requestedTemplate && TEMPLATES[requestedTemplate]) {
       const preset = TEMPLATES[requestedTemplate];
       formTitle = preset.title;

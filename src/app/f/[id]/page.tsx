@@ -585,7 +585,9 @@ export default function PublicFormPage() {
             />
           </div>
 
-          <p className="text-sm text-slate-400">Loading questionnaire...</p>
+          <p className="text-sm font-semibold text-slate-300">
+            Loading OAU questionnaire...
+          </p>
         </div>
       </main>
     );
@@ -620,7 +622,8 @@ export default function PublicFormPage() {
           <h1 className="text-2xl font-bold">Questionnaire Closed</h1>
 
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            This questionnaire is no longer accepting submissions.
+            This institutional questionnaire has reached its deadline or is no
+            longer accepting submissions.
           </p>
         </div>
       </main>
@@ -642,17 +645,19 @@ export default function PublicFormPage() {
           </div>
 
           <p
-            className="text-xs font-semibold uppercase tracking-[0.2em]"
+            className="text-xs font-bold uppercase tracking-[0.2em]"
             style={{ color: activeTheme.primary }}
           >
             Submission Confirmed
           </p>
 
-          <h1 className="mt-3 text-3xl font-bold">Response Recorded</h1>
+          <h1 className="mt-3 text-3xl font-extrabold text-white">
+            Response Recorded
+          </h1>
 
-          <p className="mt-4 text-sm leading-7 text-slate-400">
+          <p className="mt-4 text-sm leading-7 text-slate-300">
             {form.customMessage ||
-              `Thank you! Your response to "${form.title}" has been successfully saved.`}
+              `Thank you. Your submission for "${form.title}" has been successfully logged with Obafemi Awolowo University records.`}
           </p>
 
           <button
@@ -665,9 +670,9 @@ export default function PublicFormPage() {
               setSubmitted(false);
             }}
             style={{ color: activeTheme.primary }}
-            className="mt-6 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold hover:underline"
+            className="mt-6 inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold hover:underline"
           >
-            Submit another response
+            Submit another entry
           </button>
         </div>
       </main>
@@ -697,33 +702,33 @@ export default function PublicFormPage() {
         style={{ backgroundColor: activeTheme.primary }}
       />
 
-      <header className="relative z-20 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
+      <header className="relative z-20 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-black tracking-wider text-white shadow-md"
               style={{ backgroundColor: activeTheme.primary }}
             >
-              FC
+              FaaS
             </div>
 
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold text-white">
+              <h1 className="truncate text-sm sm:text-base font-bold text-white">
                 {form.title}
               </h1>
 
-              <p className="flex items-center gap-1 text-[11px] text-slate-500">
-                <School className="h-3 w-3" />
-                OAU Campus Survey
+              <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+                <School className="h-3 w-3 text-indigo-400" />
+                Obafemi Awolowo University
               </p>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/70 p-1">
+          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/80 p-1">
             <button
               type="button"
               onClick={() => setViewMode("focus")}
-              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 viewMode === "focus"
                   ? "bg-slate-800 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -736,7 +741,7 @@ export default function PublicFormPage() {
             <button
               type="button"
               onClick={() => setViewMode("classic")}
-              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 viewMode === "classic"
                   ? "bg-slate-800 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
@@ -749,7 +754,7 @@ export default function PublicFormPage() {
         </div>
 
         {viewMode === "focus" && totalSteps > 0 && (
-          <div className="h-0.5 bg-slate-900">
+          <div className="h-1 bg-slate-900">
             <div
               className="h-full transition-all duration-500"
               style={{
@@ -763,7 +768,7 @@ export default function PublicFormPage() {
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
         {errorMsg && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-medium text-rose-200">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
             <span>{errorMsg}</span>
           </div>
@@ -772,38 +777,41 @@ export default function PublicFormPage() {
         {viewMode === "focus" && (
           <section className="mx-auto max-w-2xl">
             <div className="mb-8 flex items-center justify-between text-xs">
-              <span className="font-medium text-slate-400">
-                Question {Math.min(activeStep + 1, totalSteps)} of {totalSteps}
+              <span className="font-semibold text-slate-400">
+                Item {Math.min(activeStep + 1, totalSteps)} of {totalSteps}
               </span>
 
-              <span style={{ color: activeTheme.primary }}>
-                {progressPercent}% completed
+              <span
+                className="font-bold"
+                style={{ color: activeTheme.primary }}
+              >
+                {progressPercent}% Complete
               </span>
             </div>
 
-            <div className="min-h-[420px] rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
+            <div className="min-h-[420px] rounded-3xl border border-slate-800 bg-slate-900/60 p-6 shadow-2xl backdrop-blur-xl sm:p-9">
               {isFocusEmailStep ? (
                 <div>
                   <div className="mb-8">
                     <p
-                      className="mb-3 text-xs font-semibold uppercase tracking-[0.18em]"
+                      className="mb-3 text-xs font-bold uppercase tracking-[0.2em]"
                       style={{ color: activeTheme.primary }}
                     >
-                      Step 1
+                      Authentication Required
                     </p>
 
-                    <span className="rounded-full bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-300">
-                      Required
+                    <span className="rounded-full bg-rose-500/10 px-3 py-1 text-[11px] font-bold text-rose-300">
+                      Mandatory Field
                     </span>
 
-                    <h2 className="mt-5 text-2xl font-bold leading-tight sm:text-3xl">
-                      What is your official OAU email?
+                    <h2 className="mt-5 text-2xl font-extrabold leading-tight sm:text-3xl">
+                      Official OAU Email Address
                     </h2>
 
-                    <p className="mt-3 text-sm leading-6 text-slate-400">
-                      Submissions require an official account
-                      (@student.oauife.edu.ng for students or @oauife.edu.ng for
-                      staff).
+                    <p className="mt-3 text-sm leading-6 text-slate-300">
+                      Submissions are strictly verified against official
+                      university accounts (@student.oauife.edu.ng for students
+                      or @oauife.edu.ng for academic/admin staff).
                     </p>
                   </div>
 
@@ -818,7 +826,7 @@ export default function PublicFormPage() {
                         ? activeTheme.primary
                         : undefined,
                     }}
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
+                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500"
                   />
                 </div>
               ) : currentFocusQ ? (
@@ -826,7 +834,7 @@ export default function PublicFormPage() {
                   <div className="mb-8">
                     <div className="mb-4 flex items-center gap-2">
                       <span
-                        className="text-xs font-semibold uppercase tracking-[0.18em]"
+                        className="text-xs font-bold uppercase tracking-[0.2em]"
                         style={{ color: activeTheme.primary }}
                       >
                         Question {activeStep + 1}
@@ -835,7 +843,7 @@ export default function PublicFormPage() {
                       <span className="text-slate-700">•</span>
 
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
                           currentFocusQ.required
                             ? "bg-rose-500/10 text-rose-300"
                             : "bg-slate-800 text-slate-400"
@@ -845,7 +853,7 @@ export default function PublicFormPage() {
                       </span>
                     </div>
 
-                    <h2 className="text-2xl font-bold leading-tight sm:text-3xl">
+                    <h2 className="text-2xl font-extrabold leading-tight text-white sm:text-3xl">
                       {currentFocusQ.title}
                     </h2>
                   </div>
@@ -869,11 +877,11 @@ export default function PublicFormPage() {
                           }
                           placeholder="EEG/2021/104"
                           autoFocus
-                          className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 pl-11 pr-4 py-3.5 text-sm uppercase tracking-wider text-white font-mono outline-none transition placeholder:text-slate-600 focus:border-slate-500"
+                          className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 pl-11 pr-4 py-4 text-sm uppercase tracking-wider text-white font-mono outline-none transition placeholder:text-slate-600 focus:border-indigo-500"
                         />
                       </div>
-                      <p className="text-[11px] text-slate-500">
-                        Format: DEPT/YEAR/NUMBER (e.g., CPE/2020/012 or
+                      <p className="text-xs text-slate-400">
+                        Format: DEPT/YEAR/NUMBER (e.g. CPE/2020/012 or
                         CSC/2021/045)
                       </p>
                     </div>
@@ -892,7 +900,7 @@ export default function PublicFormPage() {
                       }
                       placeholder="Type your response here..."
                       autoFocus
-                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500"
                     />
                   )}
 
@@ -909,7 +917,7 @@ export default function PublicFormPage() {
                       }
                       placeholder="e.g. name@student.oauife.edu.ng or staff@oauife.edu.ng"
                       autoFocus
-                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500"
                     />
                   )}
 
@@ -933,7 +941,7 @@ export default function PublicFormPage() {
                                 ? activeTheme.bgRgba
                                 : undefined,
                             }}
-                            className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border p-4 text-left text-xs font-medium transition sm:text-sm ${
+                            className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border p-4 text-left text-sm font-semibold transition ${
                               isSelected
                                 ? "text-white shadow-lg"
                                 : "border-slate-800 bg-slate-950/50 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
@@ -978,7 +986,7 @@ export default function PublicFormPage() {
                                 ? activeTheme.bgRgba
                                 : undefined,
                             }}
-                            className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border p-4 text-left text-xs font-medium transition sm:text-sm ${
+                            className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border p-4 text-left text-sm font-semibold transition ${
                               isSelected
                                 ? "text-white shadow-lg"
                                 : "border-slate-800 bg-slate-950/50 text-slate-300 hover:border-slate-700 hover:bg-slate-900"
@@ -988,7 +996,7 @@ export default function PublicFormPage() {
 
                             {isSelected && (
                               <span
-                                className="text-lg font-bold"
+                                className="text-base font-bold"
                                 style={{
                                   color: activeTheme.primary,
                                 }}
@@ -1013,7 +1021,7 @@ export default function PublicFormPage() {
                         handleInputChange(currentFocusQ.id, event.target.value)
                       }
                       autoFocus
-                      className="w-full cursor-pointer rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition focus:border-slate-500"
+                      className="w-full cursor-pointer rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-white outline-none transition focus:border-indigo-500"
                     >
                       <option value="">Select an option</option>
                       {(currentFocusQ.options || []).map((option) => (
@@ -1035,7 +1043,7 @@ export default function PublicFormPage() {
                       onChange={(event) =>
                         handleInputChange(currentFocusQ.id, event.target.value)
                       }
-                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-slate-200 outline-none transition focus:border-slate-500"
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-slate-200 outline-none transition focus:border-indigo-500"
                     />
                   )}
 
@@ -1048,7 +1056,7 @@ export default function PublicFormPage() {
                           <div className="flex min-w-0 items-center gap-3">
                             <Paperclip className="h-5 w-5 shrink-0 text-slate-400" />
 
-                            <span className="truncate text-sm text-slate-200">
+                            <span className="truncate text-sm font-medium text-slate-200">
                               {(answers[currentFocusQ.id] as UploadedFile).name}
                             </span>
                           </div>
@@ -1058,7 +1066,7 @@ export default function PublicFormPage() {
                             onClick={() =>
                               handleInputChange(currentFocusQ.id, null)
                             }
-                            className="ml-3 shrink-0 cursor-pointer text-xs text-rose-400 hover:underline"
+                            className="ml-3 shrink-0 cursor-pointer text-xs font-semibold text-rose-400 hover:underline"
                           >
                             Remove
                           </button>
@@ -1067,14 +1075,14 @@ export default function PublicFormPage() {
                         <label className="block cursor-pointer text-center">
                           <UploadCloud className="mx-auto mb-3 h-8 w-8 text-slate-500" />
 
-                          <span className="text-sm font-medium text-slate-200">
+                          <span className="text-sm font-semibold text-slate-200">
                             {uploadingField === currentFocusQ.id
                               ? "Uploading file..."
-                              : "Select attachment"}
+                              : "Select document or receipt"}
                           </span>
 
-                          <p className="mt-1 text-xs text-slate-500">
-                            Max file size 10MB
+                          <p className="mt-1 text-xs text-slate-400">
+                            Max upload size: 10MB
                           </p>
 
                           <input
@@ -1108,14 +1116,14 @@ export default function PublicFormPage() {
                 type="button"
                 onClick={handlePrevStep}
                 disabled={activeStep === 0 || submitting}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-800 px-5 py-3 text-xs font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-30"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-800 px-5 py-3 text-xs font-bold text-slate-300 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Previous
               </button>
 
-              <div className="hidden items-center gap-1.5 text-[10px] text-slate-600 sm:flex">
-                <CornerDownLeft className="h-3 w-3" />
+              <div className="hidden items-center gap-1.5 text-xs font-medium text-slate-500 sm:flex">
+                <CornerDownLeft className="h-3.5 w-3.5" />
                 Press Enter
               </div>
 
@@ -1132,7 +1140,7 @@ export default function PublicFormPage() {
                 style={{
                   backgroundColor: activeTheme.primary,
                 }}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-2xl px-6 py-3 text-xs font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-2xl px-6 py-3 text-xs font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {activeStep === totalSteps - 1 ? (
                   <>
@@ -1157,21 +1165,23 @@ export default function PublicFormPage() {
                 event.preventDefault();
                 void triggerSubmit();
               }}
-              className="space-y-5"
+              className="space-y-6"
             >
               <div className="mb-8">
-                <h1 className="text-3xl font-bold sm:text-4xl">{form.title}</h1>
+                <h1 className="text-3xl font-extrabold text-white sm:text-4xl">
+                  {form.title}
+                </h1>
 
                 {form.description && (
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">
+                  <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-300">
                     {form.description}
                   </p>
                 )}
               </div>
 
               {form.collectEmail && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-                  <label className="text-sm font-semibold text-slate-200">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+                  <label className="text-sm font-bold text-slate-100">
                     Official OAU Email Address{" "}
                     <span className="text-rose-400">*</span>
                   </label>
@@ -1182,11 +1192,11 @@ export default function PublicFormPage() {
                     onChange={(event) => setRespondentEmail(event.target.value)}
                     placeholder="e.g. jdoe@oauife.edu.ng or student@student.oauife.edu.ng"
                     required
-                    className="mt-3 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-slate-500"
+                    className="mt-3 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-indigo-500"
                   />
-                  <p className="mt-2 text-[11px] text-slate-500">
-                    Requires official account (@student.oauife.edu.ng or
-                    @oauife.edu.ng)
+                  <p className="mt-2 text-xs text-slate-400">
+                    Requires verified institutional account
+                    (@student.oauife.edu.ng or @oauife.edu.ng)
                   </p>
                 </div>
               )}
@@ -1194,11 +1204,11 @@ export default function PublicFormPage() {
               {questions.map((question, index) => (
                 <div
                   key={question.id}
-                  className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5"
+                  className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6"
                 >
                   <div className="flex items-start gap-3">
                     <span
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black text-white"
                       style={{
                         backgroundColor: activeTheme.bgRgba,
                         color: activeTheme.primary,
@@ -1207,7 +1217,7 @@ export default function PublicFormPage() {
                       {index + 1}
                     </span>
 
-                    <h2 className="pt-1 text-sm font-semibold text-slate-100">
+                    <h2 className="pt-0.5 text-base font-bold text-slate-100">
                       {question.title}{" "}
                       {question.required && (
                         <span className="text-rose-400">*</span>
@@ -1218,7 +1228,7 @@ export default function PublicFormPage() {
                   {question.type === "matric_number" && (
                     <div className="mt-4 space-y-2">
                       <div className="relative">
-                        <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <GraduationCap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                           type="text"
                           value={
@@ -1233,11 +1243,11 @@ export default function PublicFormPage() {
                             )
                           }
                           placeholder="EEG/2021/104"
-                          className="w-full rounded-xl border border-slate-800 bg-slate-950/80 pl-10 pr-4 py-3 text-sm uppercase tracking-wider text-white font-mono outline-none placeholder:text-slate-600 focus:border-slate-500"
+                          className="w-full rounded-xl border border-slate-800 bg-slate-950/80 pl-11 pr-4 py-3.5 text-sm uppercase tracking-wider text-white font-mono outline-none placeholder:text-slate-600 focus:border-indigo-500"
                         />
                       </div>
-                      <p className="text-[11px] text-slate-500">
-                        Format: DEPT/YEAR/NUMBER (e.g., CPE/2020/012 or
+                      <p className="text-xs text-slate-400">
+                        Format: DEPT/YEAR/NUMBER (e.g. CPE/2020/012 or
                         CSC/2021/045)
                       </p>
                     </div>
@@ -1255,7 +1265,7 @@ export default function PublicFormPage() {
                         handleInputChange(question.id, event.target.value)
                       }
                       placeholder="Your answer"
-                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-slate-500"
+                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-indigo-500"
                     />
                   )}
 
@@ -1271,7 +1281,7 @@ export default function PublicFormPage() {
                         handleInputChange(question.id, event.target.value)
                       }
                       placeholder="e.g. name@student.oauife.edu.ng or staff@oauife.edu.ng"
-                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-slate-500"
+                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-indigo-500"
                     />
                   )}
 
@@ -1280,7 +1290,7 @@ export default function PublicFormPage() {
                       {(question.options || []).map((option) => (
                         <label
                           key={option}
-                          className="flex cursor-pointer items-center gap-3 text-sm text-slate-300"
+                          className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-200"
                         >
                           <input
                             type="radio"
@@ -1313,7 +1323,7 @@ export default function PublicFormPage() {
                         return (
                           <label
                             key={option}
-                            className="flex cursor-pointer items-center gap-3 text-sm text-slate-300"
+                            className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-200"
                           >
                             <input
                               type="checkbox"
@@ -1344,7 +1354,7 @@ export default function PublicFormPage() {
                       onChange={(event) =>
                         handleInputChange(question.id, event.target.value)
                       }
-                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none focus:border-slate-500"
+                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500"
                     >
                       <option value="">Select an option</option>
 
@@ -1367,20 +1377,20 @@ export default function PublicFormPage() {
                       onChange={(event) =>
                         handleInputChange(question.id, event.target.value)
                       }
-                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-200 outline-none focus:border-slate-500"
+                      className="mt-4 w-full rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
                     />
                   )}
 
                   {question.type === "file_upload" && (
-                    <div className="mt-4 rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-4">
+                    <div className="mt-4 rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-5">
                       {answers[question.id] &&
                       typeof answers[question.id] === "object" &&
                       !Array.isArray(answers[question.id]) ? (
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-3">
-                            <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
+                            <Paperclip className="h-5 w-5 shrink-0 text-slate-400" />
 
-                            <span className="truncate text-sm text-slate-300">
+                            <span className="truncate text-sm font-medium text-slate-200">
                               {(answers[question.id] as UploadedFile).name}
                             </span>
                           </div>
@@ -1388,22 +1398,22 @@ export default function PublicFormPage() {
                           <button
                             type="button"
                             onClick={() => handleInputChange(question.id, null)}
-                            className="shrink-0 cursor-pointer text-xs text-rose-400 hover:underline"
+                            className="shrink-0 cursor-pointer text-xs font-semibold text-rose-400 hover:underline"
                           >
                             Remove
                           </button>
                         </div>
                       ) : (
                         <label className="block cursor-pointer text-center">
-                          <UploadCloud className="mx-auto mb-2 h-7 w-7 text-slate-500" />
+                          <UploadCloud className="mx-auto mb-2 h-8 w-8 text-slate-500" />
 
-                          <span className="text-sm font-medium text-slate-300">
+                          <span className="text-sm font-semibold text-slate-200">
                             {uploadingField === question.id
                               ? "Uploading file..."
-                              : "Select file to attach"}
+                              : "Select document or receipt"}
                           </span>
 
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="mt-1 text-xs text-slate-400">
                             Maximum file size: 10MB
                           </p>
 
@@ -1434,19 +1444,19 @@ export default function PublicFormPage() {
                 style={{
                   backgroundColor: activeTheme.primary,
                 }}
-                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-bold text-white shadow-xl transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? "Submitting response..." : "Submit Questionnaire"}
 
-                {!submitting && <ArrowRight className="h-4 w-4" />}
+                {!submitting && <ArrowRight className="h-5 w-5" />}
               </button>
             </form>
           </section>
         )}
       </div>
 
-      <footer className="relative z-10 border-t border-slate-900 px-6 py-8 text-center text-xs text-slate-600">
-        Powered by FormCraft • Obafemi Awolowo University
+      <footer className="relative z-10 border-t border-slate-900 px-6 py-10 text-center text-xs font-medium text-slate-500">
+        Powered by OAU FaaS • Obafemi Awolowo University
       </footer>
     </main>
   );

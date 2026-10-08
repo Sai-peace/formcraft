@@ -25,6 +25,7 @@ import {
   Trash2,
   Copy,
   Code2,
+  ShieldAlert,
 } from "lucide-react";
 import ShareModal from "@/components/ShareModal";
 import {
@@ -117,6 +118,7 @@ export default function BuilderPage({
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false);
 
   const [form, setForm] = useState<FormData | null>(null);
   const [questions, setQuestions] = useState<BuilderQuestion[]>([]);
@@ -321,7 +323,6 @@ export default function BuilderPage({
     };
   }, [formId, router]);
 
-  // Live Response Auto-Polling: every 15s when active on the responses tab
   useEffect(() => {
     if (activeTab !== "responses") return;
     const initialFetch = setTimeout(() => {
@@ -466,7 +467,6 @@ export default function BuilderPage({
     });
   }, [responses]);
 
-  // Department Breakdown Calculation for Matric Number Fields
   const departmentBreakdown = useMemo(() => {
     const matricQuestion = questions.find((q) => q.type === "matric_number");
     if (!matricQuestion) return null;
@@ -499,9 +499,9 @@ export default function BuilderPage({
     return (
       <main className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs uppercase tracking-wider text-slate-400">
-            Loading workspace...
+          <div className="w-9 h-9 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Loading OAU FaaS Studio...
           </p>
         </div>
       </main>
@@ -537,54 +537,64 @@ export default function BuilderPage({
 
   return (
     <div className="min-h-screen bg-slate-950 print:bg-white text-slate-100 print:text-slate-950 antialiased selection:bg-indigo-500 selection:text-white">
+      {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none z-0 print:hidden">
         <div className="absolute -top-32 left-1/3 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[140px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-25" />
       </div>
 
-      <header className="sticky top-0 z-40 bg-slate-900/70 border-b border-slate-800/80 backdrop-blur-xl print:hidden">
+      {/* Institutional Studio Header */}
+      <header className="sticky top-0 z-40 bg-slate-950/85 border-b border-slate-800/80 backdrop-blur-xl print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
+              {/* Logo / Return trigger with confirmation modal */}
               <button
                 type="button"
-                onClick={() => router.push("/")}
-                className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
-                title="Return to Dashboard"
+                onClick={() => setIsExitModalOpen(true)}
+                className="group flex items-center gap-2 p-1.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 transition shrink-0 cursor-pointer"
+                title="Return to Workspace"
               >
-                <ArrowLeft size={18} />
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-[10px] font-black text-white">
+                  FaaS
+                </div>
+                <ArrowLeft
+                  size={15}
+                  className="group-hover:-translate-x-0.5 transition-transform"
+                />
               </button>
 
-              <input
-                type="text"
-                value={form.title}
-                onChange={(event) => {
-                  const updated = { ...form, title: event.target.value };
-                  setForm(updated);
-                  void saveForm(questions, updated);
-                }}
-                className="font-bold text-white text-sm sm:text-base bg-transparent border-b border-transparent hover:border-slate-700 focus:border-indigo-500 outline-none pb-0.5 w-44 sm:w-72 transition truncate"
-              />
+              <div className="min-w-0">
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(event) => {
+                    const updated = { ...form, title: event.target.value };
+                    setForm(updated);
+                    void saveForm(questions, updated);
+                  }}
+                  className="font-extrabold text-white text-base sm:text-lg bg-transparent border-b border-transparent hover:border-slate-700 focus:border-indigo-500 outline-none pb-0.5 w-44 sm:w-80 transition truncate"
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <span className="hidden sm:inline text-xs text-slate-400">
+              <span className="hidden md:inline text-xs font-medium text-slate-400 mr-1">
                 {isSaving ? (
-                  "Saving..."
+                  "Syncing..."
                 ) : savedSuccess ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-400">
-                    <Check size={13} />
-                    Saved
+                  <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
+                    <Check size={14} />
+                    All changes saved
                   </span>
                 ) : (
-                  "All changes saved"
+                  "Autosaved"
                 )}
               </span>
 
               <button
                 type="button"
                 onClick={() => setIsShareOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-md shadow-indigo-600/20"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-md shadow-indigo-600/20"
               >
                 <Share2 size={14} />
                 Share
@@ -593,7 +603,7 @@ export default function BuilderPage({
               <button
                 type="button"
                 onClick={() => void togglePublishStatus()}
-                className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition cursor-pointer ${
+                className={`hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-xs font-semibold transition cursor-pointer ${
                   form.published
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
                     : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
@@ -605,7 +615,7 @@ export default function BuilderPage({
               <button
                 type="button"
                 onClick={() => setIsPreviewOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700/80 transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-800 transition cursor-pointer"
               >
                 <Eye size={14} />
                 <span>Preview</span>
@@ -613,52 +623,54 @@ export default function BuilderPage({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 pb-2 overflow-x-auto">
+          {/* Studio Navigation Tabs */}
+          <div className="flex items-center gap-2 pb-2.5 overflow-x-auto">
             <button
               type="button"
               onClick={() => setActiveTab("builder")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "builder"
-                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <Edit3 size={13} />
+              <Edit3 size={14} />
               Question Architecture
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab("responses")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "responses"
-                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <BarChart3 size={13} />
+              <BarChart3 size={14} />
               Responses ({responseCount})
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab("settings")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === "settings"
-                  ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
+                  ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              <Sliders size={13} />
-              Rules & Settings
+              <Sliders size={14} />
+              Policies & Delivery Rules
             </button>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-6 print:max-w-full print:p-0">
+      {/* Main Studio Views */}
+      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-8 print:max-w-full print:p-0">
         {activeTab === "builder" && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl">
               <input
                 type="text"
@@ -668,8 +680,8 @@ export default function BuilderPage({
                   setForm(updated);
                   void saveForm(questions, updated);
                 }}
-                placeholder="Form Title"
-                className="w-full text-2xl font-extrabold text-white border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none pb-1 transition mb-3"
+                placeholder="Institutional Form Title"
+                className="w-full text-2xl sm:text-3xl font-extrabold text-white border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none pb-2 transition mb-3"
               />
 
               <textarea
@@ -679,9 +691,9 @@ export default function BuilderPage({
                   setForm(updated);
                   void saveForm(questions, updated);
                 }}
-                placeholder="Form description or instructions for respondents..."
+                placeholder="Specify instructions, faculty guidelines, or eligibility criteria for respondents..."
                 rows={2}
-                className="w-full text-xs text-slate-400 border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none transition resize-none"
+                className="w-full text-sm text-slate-300 border-b border-transparent hover:border-slate-800 focus:border-indigo-500 bg-transparent outline-none transition resize-none leading-relaxed"
               />
             </div>
 
@@ -712,23 +724,23 @@ export default function BuilderPage({
               </SortableContext>
             </DndContext>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 print:hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 print:hidden">
               <button
                 type="button"
                 onClick={() => addQuestion("multiple_choice")}
-                className="py-4 border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
+                className="py-4 border border-dashed border-slate-800 hover:border-indigo-500/60 bg-slate-900/40 hover:bg-slate-900/80 rounded-2xl text-slate-200 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-indigo-400" />
-                Add Question Card
+                Add Standard Question Field
               </button>
 
               <button
                 type="button"
                 onClick={() => addQuestion("matric_number")}
-                className="py-4 border border-indigo-500/30 hover:border-indigo-500 bg-indigo-950/20 hover:bg-indigo-950/40 rounded-2xl text-indigo-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
+                className="py-4 border border-indigo-500/40 hover:border-indigo-500 bg-indigo-950/20 hover:bg-indigo-950/40 rounded-2xl text-indigo-200 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
               >
                 <GraduationCap className="w-4 h-4 text-indigo-400" />
-                Add OAU Matric Number Field
+                Add Verified OAU Matric Field
               </button>
             </div>
           </div>
@@ -738,14 +750,14 @@ export default function BuilderPage({
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 backdrop-blur-xl print:border-slate-300 print:bg-white print:text-slate-950">
               <div>
-                <h3 className="text-base font-bold text-white print:text-slate-950">
+                <h3 className="text-lg font-bold text-white print:text-slate-950">
                   {responses.length}{" "}
                   {responses.length === 1 ? "Response" : "Responses"} Recorded
                 </h3>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse print:hidden" />
                   <p className="text-xs text-slate-400 print:text-slate-600">
-                    Auto-updating live sync
+                    Live database synchronization active
                   </p>
                 </div>
               </div>
@@ -755,7 +767,7 @@ export default function BuilderPage({
                   type="button"
                   onClick={() => void generateAiInsights()}
                   disabled={generatingAi || responses.length === 0}
-                  className="bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-lg shadow-purple-600/20 cursor-pointer disabled:cursor-not-allowed"
+                  className="bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-purple-600/20 cursor-pointer disabled:cursor-not-allowed"
                 >
                   <Bot
                     className={`w-4 h-4 ${generatingAi ? "animate-spin" : ""}`}
@@ -771,7 +783,7 @@ export default function BuilderPage({
                   type="button"
                   onClick={handlePrintReport}
                   disabled={responses.length === 0}
-                  className="p-2 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="p-2.5 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   title="Print or Save PDF Report"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -783,7 +795,7 @@ export default function BuilderPage({
                   onClick={() => void fetchResponses()}
                   disabled={loadingResponses}
                   title="Refresh responses"
-                  className="p-2 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="p-2.5 border border-slate-800 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${loadingResponses ? "animate-spin" : ""}`}
@@ -794,7 +806,7 @@ export default function BuilderPage({
                   type="button"
                   onClick={exportToCSV}
                   disabled={responses.length === 0}
-                  className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer"
+                  className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Export CSV</span>
@@ -804,7 +816,7 @@ export default function BuilderPage({
                   <button
                     type="button"
                     onClick={() => void clearAllResponses()}
-                    className="p-2 border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 rounded-xl text-xs font-medium transition cursor-pointer"
+                    className="p-2.5 border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-semibold transition cursor-pointer"
                     title="Purge all responses"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -818,8 +830,8 @@ export default function BuilderPage({
               <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl print:border-slate-300 print:bg-white print:text-slate-950">
                 <div className="flex items-center gap-2 mb-4 border-b border-slate-800 print:border-slate-200 pb-3">
                   <GraduationCap className="h-4 w-4 text-indigo-400 print:text-indigo-700" />
-                  <h4 className="text-sm font-semibold text-white print:text-slate-950">
-                    OAU Department Distribution
+                  <h4 className="text-sm font-bold text-white print:text-slate-950">
+                    OAU Department Distribution Breakdown
                   </h4>
                 </div>
 
@@ -827,14 +839,14 @@ export default function BuilderPage({
                   {departmentBreakdown.map((dept) => (
                     <div
                       key={dept.name}
-                      className="p-3 rounded-2xl bg-slate-950/50 print:bg-slate-50 border border-slate-800/80 print:border-slate-200 flex items-center justify-between"
+                      className="p-3.5 rounded-2xl bg-slate-950/50 print:bg-slate-50 border border-slate-800/80 print:border-slate-200 flex items-center justify-between"
                     >
                       <div className="min-w-0 pr-2">
-                        <p className="text-xs font-medium text-slate-200 print:text-slate-800 truncate">
+                        <p className="text-xs font-semibold text-slate-200 print:text-slate-800 truncate">
                           {dept.name}
                         </p>
-                        <p className="text-[10px] text-slate-500">
-                          {dept.count} students
+                        <p className="text-[10px] text-slate-400">
+                          {dept.count} verified submissions
                         </p>
                       </div>
                       <span className="font-mono text-xs font-bold text-indigo-400 print:text-indigo-700">
@@ -862,10 +874,10 @@ export default function BuilderPage({
                     </div>
 
                     <div>
-                      <h4 className="font-bold text-white print:text-slate-950 text-sm">
+                      <h4 className="font-bold text-white print:text-slate-950 text-base">
                         AI Executive Synthesis
                       </h4>
-                      <p className="text-[11px] text-slate-400 print:text-slate-600">
+                      <p className="text-xs text-slate-400 print:text-slate-600">
                         Synthesized across {responses.length} responses with
                         Gemini
                       </p>
@@ -873,7 +885,7 @@ export default function BuilderPage({
                   </div>
 
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                    className={`px-3 py-1 rounded-full text-xs font-bold border ${
                       aiInsights.sentiment === "Positive"
                         ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 print:text-emerald-700"
                         : aiInsights.sentiment === "Negative"
@@ -891,7 +903,7 @@ export default function BuilderPage({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-slate-950/50 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-2xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 print:text-purple-700 mb-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300 print:text-purple-700 mb-2.5">
                       <TrendingUp className="h-3.5 w-3.5 text-purple-400 print:text-purple-700" />
                       <span>Consensus & Trends</span>
                     </div>
@@ -910,9 +922,9 @@ export default function BuilderPage({
                   </div>
 
                   <div className="bg-slate-950/50 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-2xl p-4">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300 print:text-indigo-700 mb-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300 print:text-indigo-700 mb-2.5">
                       <Lightbulb className="h-3.5 w-3.5 text-indigo-400 print:text-indigo-700" />
-                      <span>Actionable Next Steps</span>
+                      <span>Actionable Recommendations</span>
                     </div>
 
                     <ul className="space-y-2">
@@ -938,12 +950,12 @@ export default function BuilderPage({
             ) : responses.length === 0 ? (
               <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl p-12 text-center print:border-slate-300 print:text-slate-950">
                 <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                <h4 className="font-semibold text-white print:text-slate-950 text-sm">
-                  Waiting for responses
+                <h4 className="font-bold text-white print:text-slate-950 text-base">
+                  Awaiting Responses
                 </h4>
                 <p className="text-xs text-slate-400 print:text-slate-600 mt-1">
-                  Share your public form link with respondents to begin
-                  collecting data.
+                  Share your public questionnaire link to begin aggregating
+                  institutional data.
                 </p>
               </div>
             ) : (
@@ -1014,7 +1026,7 @@ export default function BuilderPage({
                         className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-sm print:border-slate-300 print:bg-white print:break-inside-avoid"
                       >
                         <div className="flex items-center justify-between border-b border-slate-800 print:border-slate-200 pb-3 mb-5">
-                          <span className="text-sm font-semibold text-white print:text-slate-950">
+                          <span className="text-base font-bold text-white print:text-slate-950">
                             {index + 1}. {question.title}
                           </span>
                           <span className="text-[10px] font-mono text-indigo-400 uppercase bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 print:border-slate-300 print:text-indigo-700">
@@ -1070,7 +1082,7 @@ export default function BuilderPage({
                             {segments.map((seg) => (
                               <div
                                 key={seg.opt}
-                                className="p-3 rounded-2xl bg-slate-950/60 print:bg-slate-50 border border-slate-800/80 print:border-slate-200"
+                                className="p-3.5 rounded-2xl bg-slate-950/60 print:bg-slate-50 border border-slate-800/80 print:border-slate-200"
                               >
                                 <div className="flex items-center justify-between text-xs mb-1.5">
                                   <div className="flex items-center gap-2">
@@ -1078,7 +1090,7 @@ export default function BuilderPage({
                                       className="h-2.5 w-2.5 rounded-full shrink-0"
                                       style={{ backgroundColor: seg.color }}
                                     />
-                                    <span className="font-medium text-slate-200 print:text-slate-800">
+                                    <span className="font-semibold text-slate-200 print:text-slate-800">
                                       {seg.opt}
                                     </span>
                                   </div>
@@ -1104,7 +1116,6 @@ export default function BuilderPage({
                     );
                   }
 
-                  // Textual responses with individual deletion
                   const textRecords = parsedResponses
                     .map((r) => ({
                       id: r.id,
@@ -1124,7 +1135,7 @@ export default function BuilderPage({
                       className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm print:border-slate-300 print:bg-white print:break-inside-avoid"
                     >
                       <div className="flex items-center justify-between border-b border-slate-800 print:border-slate-200 pb-3 mb-4">
-                        <span className="text-xs font-semibold text-white print:text-slate-950">
+                        <span className="text-sm font-bold text-white print:text-slate-950">
                           {index + 1}. {question.title}
                         </span>
                         <span className="text-[10px] font-mono text-indigo-400 uppercase print:text-indigo-700">
@@ -1133,18 +1144,18 @@ export default function BuilderPage({
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-2.5 text-center">
+                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-3 text-center">
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
-                            Total Entries
+                            Total Records
                           </div>
                           <div className="text-sm font-bold text-white print:text-slate-950 mt-0.5">
                             {textRecords.length}
                           </div>
                         </div>
 
-                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-2.5 text-center">
+                        <div className="bg-slate-950/60 print:bg-slate-50 border border-slate-800 print:border-slate-200 rounded-xl p-3 text-center">
                           <div className="text-[10px] uppercase font-semibold text-slate-500">
-                            Unique Answers
+                            Unique Entries
                           </div>
                           <div className="text-sm font-bold text-indigo-400 print:text-indigo-700 mt-0.5">
                             {
@@ -1158,7 +1169,8 @@ export default function BuilderPage({
                       <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                         {textRecords.length === 0 ? (
                           <div className="text-xs text-slate-500 italic">
-                            No responses recorded for this question.
+                            No qualitative inputs submitted for this question
+                            yet.
                           </div>
                         ) : (
                           textRecords.map((item, recIdx) => (
@@ -1204,10 +1216,11 @@ export default function BuilderPage({
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <div>
                 <h3 className="font-bold text-white text-base">
-                  Respondent Color Theme
+                  Respondent Color Accent
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Choose the brand accent color used on public respondent views.
+                  Choose the primary institutional tone displayed to
+                  respondents.
                 </p>
               </div>
 
@@ -1249,7 +1262,7 @@ export default function BuilderPage({
 
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
               <h3 className="font-bold text-white text-base">
-                Submission Limits & Deadlines
+                Submission Quotas & Schedules
               </h3>
 
               <div className="flex items-center justify-between gap-4">
@@ -1258,7 +1271,7 @@ export default function BuilderPage({
                     Accept Submissions
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    Master switch to open or close this form.
+                    Master toggle to enable or disable public form submissions.
                   </p>
                 </div>
                 <input
@@ -1274,13 +1287,13 @@ export default function BuilderPage({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Maximum Submissions
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Submission Cap
                 </label>
                 <input
                   type="number"
                   min="0"
-                  placeholder="No limit"
+                  placeholder="Unlimited entries"
                   value={form.maxSubmissions ?? ""}
                   onChange={(e) => {
                     const val =
@@ -1294,12 +1307,12 @@ export default function BuilderPage({
                   className="w-full text-xs bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white outline-none focus:border-indigo-500 transition"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Leave empty to allow unlimited submissions.
+                  Leave blank for unlimited campus submissions.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Submission Deadline
                 </label>
                 <input
@@ -1324,7 +1337,7 @@ export default function BuilderPage({
 
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-4">
               <h3 className="font-bold text-white text-base">
-                Campus Security & Anti-Duplicate
+                Campus Security & Verification
               </h3>
 
               <div className="flex items-center justify-between gap-4">
@@ -1333,8 +1346,8 @@ export default function BuilderPage({
                     Require Official OAU Email
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    Restricts submissions to verified @student.oauife.edu.ng and
-                    @oauife.edu.ng accounts.
+                    Restricts form submissions exclusively to
+                    @student.oauife.edu.ng and @oauife.edu.ng accounts.
                   </p>
                 </div>
                 <input
@@ -1352,11 +1365,11 @@ export default function BuilderPage({
               <div className="border-t border-slate-800/80 pt-4 flex items-center justify-between gap-4">
                 <div>
                   <h4 className="text-xs font-semibold text-white">
-                    Strict: One Response Per Student (Email & Matric)
+                    One Response Per Student (Email & Matric)
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    Automatically rejects duplicate submissions sharing the same
-                    student email OR matric number.
+                    Rejects duplicate submissions sharing the same verified
+                    email or matriculation number.
                   </p>
                 </div>
                 <input
@@ -1380,11 +1393,11 @@ export default function BuilderPage({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-white text-base">
-                    Live Webhook & Google Sheets Dispatch
+                    Automated Webhook Integration
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Forward submissions instantly to Google Sheets or Make.com
-                    webhooks.
+                    Synchronize responses live with Google Sheets or faculty
+                    webhook services.
                   </p>
                 </div>
                 <button
@@ -1398,8 +1411,8 @@ export default function BuilderPage({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Webhook Target URL
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Webhook Target Endpoint URL
                 </label>
                 <input
                   type="url"
@@ -1417,16 +1430,16 @@ export default function BuilderPage({
 
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl space-y-5">
               <h3 className="font-bold text-white text-base">
-                Post-Submission Experience
+                Confirmation & Feedback Experience
               </h3>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Custom Thank You Message
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Custom Acknowledgment Message
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Thank you for submitting your response!"
+                  placeholder="Thank you. Your responses have been officially recorded."
                   value={form.customMessage || ""}
                   onChange={(e) => {
                     const updated = { ...form, customMessage: e.target.value };
@@ -1438,12 +1451,12 @@ export default function BuilderPage({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Redirect URL (Optional)
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Post-Submission Redirect URL (Optional)
                 </label>
                 <input
                   type="url"
-                  placeholder="https://yourwebsite.com/thank-you"
+                  placeholder="https://oauife.edu.ng/department/clearance"
                   value={form.redirectUrl || ""}
                   onChange={(e) => {
                     const updated = { ...form, redirectUrl: e.target.value };
@@ -1457,6 +1470,48 @@ export default function BuilderPage({
           </div>
         )}
       </main>
+
+      {/* CONFIRM EXIT MODAL */}
+      {isExitModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setIsExitModalOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+
+            <h3 className="mt-4 text-lg font-bold text-white">
+              Exit Form Studio?
+            </h3>
+            <p className="mt-2 text-xs leading-relaxed text-slate-400">
+              Your questionnaire updates have been autosaved. Are you sure you
+              want to return to the main workspace?
+            </p>
+
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setIsExitModalOpen(false)}
+                className="rounded-xl border border-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
+              >
+                Stay in Studio
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-indigo-500 transition"
+              >
+                Return to Workspace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Google Apps Script Modal */}
       {showScriptModal && (
