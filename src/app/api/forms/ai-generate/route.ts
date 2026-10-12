@@ -10,9 +10,9 @@ export const maxDuration = 30;
 // Cascading models with independent daily free quotas
 const CANDIDATE_MODELS = [
   "gemini-2.5-flash",
-  "gemini-3.5-flash",
   "gemini-2.5-flash-lite",
-  "gemini-3.8-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest",
 ];
 
 export async function POST(req: Request) {
