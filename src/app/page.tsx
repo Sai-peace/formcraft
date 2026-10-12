@@ -2,6 +2,7 @@
 
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
+import AuthModal from "@/components/AuthModal";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -74,6 +75,8 @@ const AI_SUGGESTED_PROMPTS = [
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const [forms, setForms] = useState<FormItem[]>([]);
   const [loadingForms, setLoadingForms] = useState(false);
@@ -1055,7 +1058,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => void signIn("google")}
+              onClick={() => setIsAuthModalOpen(true)}
               className="cursor-pointer rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
             >
               Institutional Login
@@ -1063,7 +1066,7 @@ export default function HomePage() {
 
             <button
               type="button"
-              onClick={() => void signIn("google")}
+              onClick={() => setIsAuthModalOpen(true)}
               className="flex cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-500"
             >
               <span>Get Started</span>
@@ -1093,7 +1096,7 @@ export default function HomePage() {
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <button
             type="button"
-            onClick={() => void signIn("google")}
+            onClick={() => setIsAuthModalOpen(true)}
             className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-2xl bg-indigo-600 px-8 py-4 text-base font-bold text-white shadow-xl shadow-indigo-600/30 transition hover:scale-[1.02] hover:bg-indigo-500 sm:w-auto"
           >
             Authenticate with OAU Generic Email
@@ -1263,7 +1266,7 @@ export default function HomePage() {
 
           <button
             type="button"
-            onClick={() => void signIn("google")}
+            onClick={() => setIsAuthModalOpen(true)}
             className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-xs font-semibold text-slate-300 transition hover:border-slate-700 hover:text-white sm:w-auto"
           >
             Institutional Access
@@ -1271,6 +1274,11 @@ export default function HomePage() {
           </button>
         </div>
       </footer>
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
     </main>
   );
 }

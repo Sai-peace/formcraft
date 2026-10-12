@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -119,6 +119,14 @@ export default function SortableQuestionCard({
     id: question.id,
   });
 
+  const [theme] = useState<"dark" | "light">(() => {
+    if (typeof window === "undefined") return "dark";
+
+    return localStorage.getItem("oau_faas_theme") === "light" ? "light" : "dark";
+  });
+
+  const isDark = theme === "dark";
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -155,9 +163,7 @@ export default function SortableQuestionCard({
 
   const handleOptionChange = (index: number, value: string) => {
     const updatedOptions = [...(question.options || [])];
-
     updatedOptions[index] = value;
-
     onUpdate({
       ...question,
       options: updatedOptions,
@@ -166,7 +172,6 @@ export default function SortableQuestionCard({
 
   const addOption = () => {
     const options = question.options || [];
-
     onUpdate({
       ...question,
       options: [...options, `Option ${options.length + 1}`],
@@ -177,7 +182,6 @@ export default function SortableQuestionCard({
     const options = (question.options || []).filter(
       (_, optionIndex) => optionIndex !== index,
     );
-
     onUpdate({
       ...question,
       options,
@@ -195,22 +199,25 @@ export default function SortableQuestionCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-slate-900/70 border border-slate-800 rounded-3xl backdrop-blur-xl transition-shadow ${
-        isDragging
-          ? "shadow-2xl shadow-indigo-500/10 ring-1 ring-indigo-500/20"
-          : "shadow-sm"
-      }`}
+      className={`border rounded-3xl backdrop-blur-xl transition-all ${
+        isDark
+          ? "bg-slate-900/70 border-slate-800"
+          : "bg-[#FAF8F3] border-[#E0D8C8] shadow-sm"
+      } ${isDragging ? "shadow-2xl ring-1 ring-indigo-500/20" : ""}`}
     >
       {/* Card Header & Content */}
       <div className="p-5 sm:p-6">
-        {/* Card Header */}
         <div className="flex items-start gap-3">
           {/* Drag Handle */}
           <button
             type="button"
             {...attributes}
             {...listeners}
-            className="mt-1.5 p-1.5 text-slate-600 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition cursor-grab active:cursor-grabbing touch-none"
+            className={`mt-1.5 p-1.5 rounded-lg transition cursor-grab active:cursor-grabbing touch-none ${
+              isDark
+                ? "text-slate-600 hover:text-slate-300 hover:bg-slate-800"
+                : "text-stone-400 hover:text-stone-700 hover:bg-[#EFEAE0]"
+            }`}
             title="Drag to reorder"
             aria-label="Drag to reorder question"
           >
@@ -221,29 +228,39 @@ export default function SortableQuestionCard({
             {/* Question Type Selector Pill */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
               <div className="relative inline-flex items-center w-fit">
-                <SelectedIcon className="absolute left-2.5 w-3.5 h-3.5 text-indigo-400 pointer-events-none" />
+                <SelectedIcon className="absolute left-2.5 w-3.5 h-3.5 text-indigo-500 pointer-events-none" />
 
                 <select
                   value={question.type}
                   onChange={handleTypeChange}
-                  className="appearance-none pl-8 pr-8 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded-full outline-none focus:border-indigo-500/50 cursor-pointer"
+                  className={`appearance-none pl-8 pr-8 py-1.5 text-[10px] font-bold uppercase tracking-wide rounded-full border outline-none cursor-pointer ${
+                    isDark
+                      ? "text-indigo-300 bg-indigo-500/10 border-indigo-500/20 focus:border-indigo-500/50"
+                      : "text-indigo-900 bg-indigo-50 border-indigo-200 focus:border-indigo-400"
+                  }`}
                   aria-label="Question type"
                 >
                   {QUESTION_TYPES.map((type) => (
                     <option
                       key={type.value}
                       value={type.value}
-                      className="bg-slate-900 text-slate-200"
+                      className={
+                        isDark
+                          ? "bg-slate-900 text-slate-200"
+                          : "bg-white text-stone-900"
+                      }
                     >
                       {type.label}
                     </option>
                   ))}
                 </select>
 
-                <ChevronDown className="absolute right-2.5 w-3 h-3 text-indigo-400 pointer-events-none" />
+                <ChevronDown className="absolute right-2.5 w-3 h-3 text-indigo-500 pointer-events-none" />
               </div>
 
-              <span className="hidden sm:block text-[10px] text-slate-600">
+              <span
+                className={`hidden sm:block text-[10px] ${isDark ? "text-slate-500" : "text-stone-400"}`}
+              >
                 {selectedType?.label || "Question"}
               </span>
             </div>
@@ -254,13 +271,23 @@ export default function SortableQuestionCard({
               value={question.title}
               onChange={(event) => handleTitleChange(event.target.value)}
               placeholder="Enter question text..."
-              className="w-full text-sm font-semibold text-white placeholder:text-slate-500 border-b border-transparent hover:border-slate-800 focus:border-indigo-500 pb-1.5 outline-none transition bg-transparent"
+              className={`w-full text-base font-bold border-b pb-1.5 outline-none transition bg-transparent ${
+                isDark
+                  ? "text-white placeholder:text-slate-500 border-transparent hover:border-slate-800 focus:border-indigo-500"
+                  : "text-[#111827] placeholder:text-stone-400 border-transparent hover:border-stone-300 focus:border-indigo-500"
+              }`}
             />
 
             {/* Short Answer Preview */}
             {question.type === "short_answer" && (
               <div className="mt-4">
-                <div className="w-full px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/50 text-xs text-slate-600">
+                <div
+                  className={`w-full px-3.5 py-3 rounded-xl border text-xs ${
+                    isDark
+                      ? "border-slate-800 bg-slate-950/50 text-slate-500"
+                      : "border-[#DFD7C7] bg-[#FFFFFF] text-stone-400"
+                  }`}
+                >
                   Respondent short answer text entry...
                 </div>
               </div>
@@ -268,7 +295,13 @@ export default function SortableQuestionCard({
 
             {question.type === "matric_number" && (
               <div className="mt-4">
-                <div className="w-full px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/50 text-xs text-slate-600">
+                <div
+                  className={`w-full px-3.5 py-3 rounded-xl border text-xs font-mono uppercase ${
+                    isDark
+                      ? "border-slate-800 bg-slate-950/50 text-slate-500"
+                      : "border-[#DFD7C7] bg-[#FFFFFF] text-stone-400"
+                  }`}
+                >
                   e.g. EEG/2021/104
                 </div>
               </div>
@@ -277,8 +310,14 @@ export default function SortableQuestionCard({
             {/* Email Preview */}
             {question.type === "email" && (
               <div className="mt-4">
-                <div className="flex items-center gap-2 w-full px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/50 text-xs text-slate-600">
-                  <Mail className="w-3.5 h-3.5 text-slate-500" />
+                <div
+                  className={`flex items-center gap-2 w-full px-3.5 py-3 rounded-xl border text-xs ${
+                    isDark
+                      ? "border-slate-800 bg-slate-950/50 text-slate-500"
+                      : "border-[#DFD7C7] bg-[#FFFFFF] text-stone-400"
+                  }`}
+                >
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
                   name@student.oauife.edu.ng
                 </div>
               </div>
@@ -287,8 +326,14 @@ export default function SortableQuestionCard({
             {/* Date Selector Preview */}
             {question.type === "date" && (
               <div className="mt-4">
-                <div className="flex items-center gap-2 w-full px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/50 text-xs text-slate-600">
-                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <div
+                  className={`flex items-center gap-2 w-full px-3.5 py-3 rounded-xl border text-xs ${
+                    isDark
+                      ? "border-slate-800 bg-slate-950/50 text-slate-500"
+                      : "border-[#DFD7C7] bg-[#FFFFFF] text-stone-400"
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
                   DD / MM / YYYY
                 </div>
               </div>
@@ -296,14 +341,22 @@ export default function SortableQuestionCard({
 
             {/* File Upload Preview */}
             {question.type === "file_upload" && (
-              <div className="mt-4 border border-dashed border-slate-800 bg-slate-950/50 rounded-xl p-5 text-center">
-                <UploadCloud className="w-6 h-6 text-slate-500 mx-auto mb-2" />
-
-                <p className="text-xs text-slate-400">
+              <div
+                className={`mt-4 border border-dashed rounded-xl p-5 text-center ${
+                  isDark
+                    ? "border-slate-800 bg-slate-950/50"
+                    : "border-[#DFD7C7] bg-[#FFFFFF]"
+                }`}
+              >
+                <UploadCloud className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+                <p
+                  className={`text-xs font-semibold ${isDark ? "text-slate-300" : "text-stone-700"}`}
+                >
                   Respondents will attach files directly
                 </p>
-
-                <p className="text-[10px] text-slate-600 mt-1">
+                <p
+                  className={`text-[10px] mt-1 ${isDark ? "text-slate-500" : "text-stone-400"}`}
+                >
                   Supports documents, images, and attachments (up to 10MB)
                 </p>
               </div>
@@ -311,13 +364,17 @@ export default function SortableQuestionCard({
 
             {/* Multiple Choice / Checkbox / Dropdown Options */}
             {hasOptions && (
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 space-y-2.5">
                 {(question.options || []).map((option, index) => (
                   <div
                     key={`${question.id}-option-${index}`}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2.5"
                   >
-                    <span className="w-5 text-center text-slate-500 text-sm shrink-0">
+                    <span
+                      className={`w-5 text-center text-xs font-semibold shrink-0 ${
+                        isDark ? "text-slate-500" : "text-stone-400"
+                      }`}
+                    >
                       {question.type === "checkbox"
                         ? "☐"
                         : question.type === "multiple_choice"
@@ -332,14 +389,22 @@ export default function SortableQuestionCard({
                         handleOptionChange(index, event.target.value)
                       }
                       placeholder={`Option ${index + 1}`}
-                      className="flex-1 min-w-0 text-xs text-slate-200 placeholder:text-slate-500 bg-slate-950/60 hover:bg-slate-950 focus:bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 rounded-xl px-3 py-2 outline-none transition"
+                      className={`flex-1 min-w-0 text-xs font-medium rounded-xl px-3.5 py-2.5 border outline-none transition ${
+                        isDark
+                          ? "text-slate-100 placeholder:text-slate-500 bg-slate-950/60 hover:bg-slate-950 focus:bg-slate-950 border-slate-800 hover:border-slate-700 focus:border-indigo-500"
+                          : "text-stone-900 placeholder:text-stone-400 bg-[#FFFFFF] hover:bg-white focus:bg-white border-[#DFD7C7] hover:border-stone-400 focus:border-indigo-500 shadow-sm"
+                      }`}
                     />
 
                     {(question.options || []).length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeOption(index)}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition cursor-pointer shrink-0"
+                        className={`p-1.5 rounded-lg transition cursor-pointer shrink-0 ${
+                          isDark
+                            ? "text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
+                            : "text-stone-400 hover:text-rose-600 hover:bg-rose-50"
+                        }`}
                         title="Remove option"
                         aria-label={`Remove option ${index + 1}`}
                       >
@@ -352,7 +417,7 @@ export default function SortableQuestionCard({
                 <button
                   type="button"
                   onClick={addOption}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 px-2 py-1.5 rounded-lg hover:bg-indigo-500/10 transition cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-500 hover:text-indigo-600 px-2 py-1.5 rounded-lg transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Add Option
@@ -368,7 +433,11 @@ export default function SortableQuestionCard({
               onClick={() => onDuplicate(question)}
               title="Duplicate Question"
               aria-label="Duplicate Question"
-              className="p-2 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-xl transition cursor-pointer"
+              className={`p-2 rounded-xl transition cursor-pointer ${
+                isDark
+                  ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                  : "text-stone-400 hover:text-stone-700 hover:bg-[#EFEAE0]"
+              }`}
             >
               <Copy className="w-4 h-4" />
             </button>
@@ -378,7 +447,11 @@ export default function SortableQuestionCard({
               onClick={() => onDelete(question.id)}
               title="Delete Question"
               aria-label="Delete Question"
-              className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-xl transition cursor-pointer"
+              className={`p-2 rounded-xl transition cursor-pointer ${
+                isDark
+                  ? "text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"
+                  : "text-stone-400 hover:text-rose-600 hover:bg-rose-50"
+              }`}
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -387,7 +460,11 @@ export default function SortableQuestionCard({
       </div>
 
       {/* Card Footer: Required Toggle */}
-      <div className="border-t border-slate-800/80 px-5 sm:px-6 py-3 flex items-center justify-between">
+      <div
+        className={`border-t px-5 sm:px-6 py-3 flex items-center justify-between ${
+          isDark ? "border-slate-800/80" : "border-[#E0D8C8]"
+        }`}
+      >
         <label className="inline-flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -398,15 +475,23 @@ export default function SortableQuestionCard({
                 required: event.target.checked,
               });
             }}
-            className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0 cursor-pointer h-4 w-4"
+            className={`rounded cursor-pointer h-4 w-4 ${
+              isDark
+                ? "border-slate-700 bg-slate-950 text-indigo-600"
+                : "border-[#DFD7C7] bg-white text-indigo-600"
+            }`}
           />
 
-          <span className="text-[11px] font-medium text-slate-400">
+          <span
+            className={`text-[11px] font-medium ${isDark ? "text-slate-400" : "text-stone-600"}`}
+          >
             Required question
           </span>
         </label>
 
-        <span className="text-[10px] text-slate-600">
+        <span
+          className={`text-[10px] font-semibold ${isDark ? "text-slate-500" : "text-stone-400"}`}
+        >
           {selectedType?.label || "Question"}
         </span>
       </div>
