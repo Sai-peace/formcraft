@@ -93,8 +93,7 @@ Guidelines:
 
     let responseText = "";
     let lastErrorMessage = "";
-
-    // Iterate through candidate models for instant failover
+     // Iterate through candidate models for instant failover
     for (const model of CANDIDATE_MODELS) {
       try {
         const response = await ai.models.generateContent({
@@ -106,16 +105,20 @@ Guidelines:
           },
         });
 
-        if (response.text) {
-          responseText = response.text.trim();
+        const output =
+          response.text || response.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (output && typeof output === "string") {
+          responseText = output.trim();
+          console.log(
+            `[AI Form Gen] Successfully generated with model: ${model}`,
+          );
           break;
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         lastErrorMessage = msg;
-        console.warn(
-          `[AI Form Gen] ${model} unavailable or quota hit: ${msg.slice(0, 150)}`,
-        );
+        console.error(`[AI Form Gen Error] Model "${model}" failed:`, err);
       }
     }
 
